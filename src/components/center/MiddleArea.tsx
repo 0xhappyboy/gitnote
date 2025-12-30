@@ -1,102 +1,193 @@
-import React from "react"
-import { themeManager } from "../../globals/theme/ThemeManager";
-import { overflowManager } from "../../globals/theme/OverflowTypeManager";
-import { withRouter } from "../../WithRouter";
+import React from 'react';
+import {
+  Button
+} from '@blueprintjs/core';
 
 interface MiddleAreaProps {
-  location?: any;
+  children: React.ReactNode;
+  activePage: string;
+  onPageChange: (page: string) => void;
+  isDark: boolean;
 }
 
-interface MiddleAreaState {
-  contentHeight: number;
-  theme: 'dark' | 'light',
-  overflow: 'auto' | 'hidden' | 'scroll' | 'visible';
-}
-
-class MiddleArea extends React.Component<MiddleAreaProps, MiddleAreaState> {
-  private contentRef: React.RefObject<HTMLDivElement>;
-  private unsubscribe: (() => void) | null = null;
-  private unsubscribeOverflow: (() => void) | null = null;
-  private TOP_AREA_HEIGHT = 30;
-
-  constructor(props: MiddleAreaProps) {
-    super(props);
-    this.contentRef = React.createRef() as React.RefObject<HTMLDivElement>;
-    this.state = {
-      theme: themeManager.getTheme(),
-      contentHeight: 0,
-      overflow: overflowManager.getOverflow()
-    };
-  }
-
-  getCurrentTheme = (): 'dark' | 'light' => {
-    return document.documentElement.classList.contains('bp4-dark') ? 'dark' : 'light';
-  };
-
-  handleThemeChange = (event: any) => {
-    const newTheme = event.detail?.theme ||
-      (document.documentElement.classList.contains('bp4-dark') ? 'dark' : 'light');
-    this.setState({ theme: newTheme });
-  };
-
-  componentDidMount() {
-    this.updateContentHeight();
-    window.addEventListener('resize', this.updateContentHeight);
-    this.unsubscribe = themeManager.subscribe((theme) => {
-      this.setState({ theme });
-    });
-    this.unsubscribeOverflow = overflowManager.subscribe((overflow) => {
-      this.setState({ overflow });
-    });
-  }
-
-  componentWillUnmount() {
-    window.removeEventListener('resize', this.updateContentHeight);
-  }
-
-  updateContentHeight = () => {
-    const container = this.contentRef.current;
-    const { location } = this.props;
-    if (container) {
-      const windowHeight = window.innerHeight;
-      let contentHeight;
-      contentHeight = windowHeight - this.TOP_AREA_HEIGHT;
-      this.setState({ contentHeight });
-    }
-  }
-
-  componentDidUpdate(prevProps: MiddleAreaProps) {
-    if (prevProps.location?.pathname !== this.props.location?.pathname) {
-      this.updateContentHeight();
-    }
-  }
-
-  handleOverflowChange = (overflow: 'auto' | 'hidden' | 'scroll' | 'visible') => {
-    this.setState({ overflow });
-  };
-
-  render() {
-    const { contentHeight, overflow } = this.state;
-    const { theme } = this.state;
-    const backgroundColor = theme === 'dark' ? '#1C2127' : '#FFFFFF';
-    const textColor = theme === 'dark' ? '#F5F8FA' : '#182026';
-    const borderColor = theme === 'dark' ? '#394B59' : '#DCE0E5';
-    return (
+const MiddleArea: React.FC<MiddleAreaProps> = ({
+  children,
+  activePage,
+  onPageChange,
+  isDark
+}) => {
+  return (
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        overflow: 'hidden',
+        backgroundColor: isDark ? '#000000' : '#FFFFFF'
+      }}
+    >
       <div
-        ref={this.contentRef}
         style={{
-          height: contentHeight > 0 ? `${contentHeight}px` : 'calc(100vh - 110px)',
-          overflow: overflow,
-          width: '100%',
-          backgroundColor: backgroundColor,
-          color: textColor,
-          borderColor: borderColor,
+          width: '50px',
+          backgroundColor: isDark ? '#000000' : '#FFFFFF',
+          borderRight: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '12px 0',
+          flexShrink: 0
         }}
       >
-        {this.props.children}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            flex: 1
+          }}
+        >
+          <Button
+            minimal
+            icon="history"
+            title="Latest"
+            onClick={() => onPageChange('latest')}
+            active={activePage === 'latest'}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              backgroundColor: activePage === 'latest'
+                ? (isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)')
+                : 'transparent',
+              color: isDark ? '#E8E8E8' : '#333333'
+            }}
+          />
+          <Button
+            minimal
+            icon="document"
+            title="Notes"
+            onClick={() => onPageChange('notes')}
+            active={activePage === 'notes'}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              backgroundColor: activePage === 'notes'
+                ? (isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)')
+                : 'transparent',
+              color: isDark ? '#E8E8E8' : '#333333'
+            }}
+          />
+          <Button
+            minimal
+            icon="star"
+            title="Favorites"
+            onClick={() => onPageChange('favorites')}
+            active={activePage === 'favorites'}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              backgroundColor: activePage === 'favorites'
+                ? (isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)')
+                : 'transparent',
+              color: isDark ? '#E8E8E8' : '#333333'
+            }}
+          />
+          <Button
+            minimal
+            icon="tag"
+            title="Tags"
+            onClick={() => onPageChange('tags')}
+            active={activePage === 'tags'}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              backgroundColor: activePage === 'tags'
+                ? (isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)')
+                : 'transparent',
+              color: isDark ? '#E8E8E8' : '#333333'
+            }}
+          />
+          <Button
+            minimal
+            icon="tick-circle"
+            title="Todo"
+            onClick={() => onPageChange('todo')}
+            active={activePage === 'todo'}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              backgroundColor: activePage === 'todo'
+                ? (isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)')
+                : 'transparent',
+              color: isDark ? '#E8E8E8' : '#333333'
+            }}
+          />
+          <Button
+            minimal
+            icon="applications"
+            title="Apps"
+            onClick={() => onPageChange('apps')}
+            active={activePage === 'apps'}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              backgroundColor: activePage === 'apps'
+                ? (isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)')
+                : 'transparent',
+              color: isDark ? '#E8E8E8' : '#333333'
+            }}
+          />
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            paddingTop: '20px'
+          }}
+        >
+          <Button
+            minimal
+            icon="refresh"
+            title="Refresh"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              color: isDark ? '#E8E8E8' : '#333333'
+            }}
+          />
+          <Button
+            minimal
+            icon="cog"
+            title="Settings"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '6px',
+              color: isDark ? '#E8E8E8' : '#333333'
+            }}
+          />
+        </div>
       </div>
-    )
-  }
-}
+      <div
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden'
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
 
-export default withRouter(MiddleArea);
+export default MiddleArea;

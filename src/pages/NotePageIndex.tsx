@@ -467,12 +467,8 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                         >
                             <div
                                 style={{
-                                    height: '35px',
                                     padding: '8px 12px',
                                     borderBottom: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
-                                    flexShrink: 0,
-                                    display: 'flex',
-                                    gap: '8px'
                                 }}
                             >
                                 <InputGroup
@@ -481,19 +477,13 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                     value={searchQuery}
                                     onChange={this.handleSearchChange}
                                     style={{
-                                        height: '100%',
+                                        height: '30px',
                                         backgroundColor: isDark ? '#2A2A2A' : '#FAFAFA',
-                                        flex: 1
+                                        width: '100%',
+                                        border: 'none'
                                     }}
-                                    small={true}
                                 />
-                                <Button
-                                    icon="menu"
-                                    minimal={true}
-                                    onClick={this.toggleLeftPanel}
-                                    small={true}
-                                    title="Hide sidebar"
-                                />
+
                             </div>
                             <div
                                 style={{
@@ -591,21 +581,103 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                         position: 'relative'
                     }}
                 >
-                    {!isLeftPanelVisible && (
+                    <div
+                        style={{
+                            height: '40px',
+                            padding: '0 24px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            flexShrink: 0,
+                            borderBottom: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
+                            backgroundColor: isDark ? '#1A1A1A' : '#F5F5F5'
+                        }}
+                    >
                         <Button
-                            icon="menu"
+                            icon={isLeftPanelVisible ? "menu-closed" : "menu-open"}
                             minimal={true}
                             onClick={this.toggleLeftPanel}
-                            style={{
-                                position: 'absolute',
-                                left: '12px',
-                                top: '12px',
-                                zIndex: 10
-                            }}
                             small={true}
-                            title="Show sidebar"
+                            title={isLeftPanelVisible ? "Hide sidebar" : "Show sidebar"}
                         />
-                    )}
+                        <Button
+                            icon="chevron-left"
+                            minimal={true}
+                            small={true}
+                            title="Previous"
+                            onClick={() => console.log('Previous clicked')}
+                        />
+                        <Button
+                            icon="chevron-right"
+                            minimal={true}
+                            small={true}
+                            title="Next"
+                            onClick={() => console.log('Next clicked')}
+                        />
+                        <div style={{
+                            height: '16px',
+                            width: '1px',
+                            backgroundColor: isDark ? '#333333' : '#E1E1E1',
+                            margin: '0 8px'
+                        }} />
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '12px',
+                            color: isDark ? '#8A8A8A' : '#666666',
+                            flex: 1,
+                            overflow: 'hidden'
+                        }}>
+                            {(() => {
+                                const activeNote = this.getActiveNote();
+                                if (!activeNote) return null;
+                                const folder = this.state.folders.find(f => f.id === activeNote.folderId);
+                                if (!folder) return <span>Unknown folder</span>;
+                                const getFolderPath = (folderId: string, path: string[] = []): string[] => {
+                                    const currentFolder = this.state.folders.find(f => f.id === folderId);
+                                    if (!currentFolder) return path;
+
+                                    const newPath = [currentFolder.name, ...path];
+
+                                    if (currentFolder.parentId) {
+                                        return getFolderPath(currentFolder.parentId, newPath);
+                                    }
+
+                                    return newPath;
+                                };
+                                const folderPath = getFolderPath(activeNote.folderId);
+                                return (
+                                    <>
+                                        {folderPath.map((folderName, index) => (
+                                            <React.Fragment key={index}>
+                                                <span style={{
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    {folderName}
+                                                </span>
+                                                {index < folderPath.length - 1 && (
+                                                    <Icon icon="chevron-small-right" iconSize={10} style={{ margin: '0 2px' }} />
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                        <Icon icon="chevron-right" iconSize={10} style={{ margin: '0 2px' }} />
+                                        <span style={{
+                                            fontWeight: '600',
+                                            color: isDark ? '#E8E8E8' : '#1A1A1A',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            whiteSpace: 'nowrap'
+                                        }}>
+                                            {activeNote.title}
+                                        </span>
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    </div>
                     <div
                         style={{
                             height: '70px',

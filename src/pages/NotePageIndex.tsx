@@ -36,6 +36,9 @@ interface NotePageIndexState {
     isDeleteDialogOpen: boolean;
     noteToDelete: string | null;
     expandedFolders: Set<string>;
+    leftPanelWidth: number;
+    isLeftPanelVisible: boolean;
+    isResizing: boolean;
 }
 
 class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexState> {
@@ -43,6 +46,9 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     private contentRef = React.createRef<HTMLTextAreaElement>();
     private titleRef = React.createRef<HTMLInputElement>();
     private autoSaveInterval: NodeJS.Timeout | null = null;
+    private containerRef = React.createRef<HTMLDivElement>();
+    private LEFT_MIN_WIDTH = 20;
+    private MAX_WIDTH = 50;
 
     constructor(props: NotePageIndexProps) {
         super(props);
@@ -125,13 +131,17 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             searchQuery: '',
             isDeleteDialogOpen: false,
             noteToDelete: null,
-            expandedFolders: new Set(['folder1', 'folder2', 'folder3', 'folder4'])
+            expandedFolders: new Set(['folder1', 'folder2', 'folder3', 'folder4']),
+            leftPanelWidth: this.LEFT_MIN_WIDTH,
+            isLeftPanelVisible: true,
+            isResizing: false
         };
     }
 
     componentDidMount() {
         this.unsubscribe = themeManager.subscribe(this.handleThemeChange);
         this.setupAutoSave();
+        this.setupResizeListeners();
     }
 
     componentWillUnmount() {
@@ -139,6 +149,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             this.unsubscribe();
         }
         this.cleanupAutoSave();
+        this.cleanupResizeListeners();
     }
 
     private handleThemeChange = (theme: 'dark' | 'light'): void => {
@@ -254,26 +265,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         });
     };
 
-    private addTagToNote = (noteId: string, tag: string): void => {
-        this.setState(prevState => ({
-            notes: prevState.notes.map(note =>
-                note.id === noteId && !note.tags.includes(tag)
-                    ? { ...note, tags: [...note.tags, tag], updatedAt: new Date() }
-                    : note
-            )
-        }));
-    };
-
-    private removeTagFromNote = (noteId: string, tag: string): void => {
-        this.setState(prevState => ({
-            notes: prevState.notes.map(note =>
-                note.id === noteId
-                    ? { ...note, tags: note.tags.filter(t => t !== tag), updatedAt: new Date() }
-                    : note
-            )
-        }));
-    };
-
     private toggleFolder = (folderId: string): void => {
         this.setState(prevState => {
             const newExpandedFolders = new Set(prevState.expandedFolders);
@@ -284,6 +275,12 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             }
             return { expandedFolders: newExpandedFolders };
         });
+    };
+
+    private toggleLeftPanel = (): void => {
+        this.setState(prevState => ({
+            isLeftPanelVisible: !prevState.isLeftPanelVisible
+        }));
     };
 
     private formatDate = (date: Date): string => {
@@ -305,6 +302,37 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
 
     private getNotesByFolderId = (folderId: string) => {
         return this.state.notes.filter(note => note.folderId === folderId);
+    };
+
+    private setupResizeListeners = (): void => {
+        document.addEventListener('mousemove', this.handleResizeMove);
+        document.addEventListener('mouseup', this.handleResizeEnd);
+    };
+
+    private cleanupResizeListeners = (): void => {
+        document.removeEventListener('mousemove', this.handleResizeMove);
+        document.removeEventListener('mouseup', this.handleResizeEnd);
+    };
+
+    private handleResizeStart = (e: React.MouseEvent): void => {
+        e.preventDefault();
+        this.setState({ isResizing: true });
+    };
+
+    private handleResizeMove = (e: MouseEvent): void => {
+        const { isResizing, leftPanelWidth } = this.state;
+        if (!isResizing || !this.containerRef.current) return;
+        const containerWidth = this.containerRef.current.clientWidth;
+        const mouseX = e.clientX;
+        const containerLeft = this.containerRef.current.getBoundingClientRect().left;
+        let newWidth = ((mouseX - containerLeft) / containerWidth) * 100;
+        newWidth = Math.max(this.LEFT_MIN_WIDTH, newWidth);
+        newWidth = Math.min(this.MAX_WIDTH, newWidth);
+        this.setState({ leftPanelWidth: newWidth });
+    };
+
+    private handleResizeEnd = (): void => {
+        this.setState({ isResizing: false });
     };
 
     private renderFolderTree = (parentId: string | null = null, level: number = 0): React.ReactNode => {
@@ -407,11 +435,12 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     };
 
     render() {
-        const { theme, searchQuery, isDeleteDialogOpen } = this.state;
+        const { theme, searchQuery, isDeleteDialogOpen, leftPanelWidth, isLeftPanelVisible, isResizing } = this.state;
         const activeNote = this.getActiveNote();
         const isDark = theme === 'dark';
         return (
             <div
+                ref={this.containerRef}
                 className={isDark ? Classes.DARK : ''}
                 style={{
                     height: '100%',
@@ -419,119 +448,181 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                     backgroundColor: isDark ? '#000000' : '#FFFFFF',
                     display: 'flex',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    cursor: isResizing ? 'col-resize' : 'default'
                 }}
             >
-                <div
-                    style={{
-                        width: '280px',
-                        backgroundColor: isDark ? '#000000' : '#FFFFFF',
-                        borderRight: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        overflow: 'hidden'
-                    }}
-                >
-                    <div
-                        style={{
-                            height: '35px',
-                            padding: '8px 12px',
-                            borderBottom: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
-                            flexShrink: 0
-                        }}
-                    >
-                        <InputGroup
-                            leftIcon="search"
-                            placeholder="Search notes..."
-                            value={searchQuery}
-                            onChange={this.handleSearchChange}
+                {isLeftPanelVisible && (
+                    <>
+                        <div
                             style={{
-                                height: '100%',
-                                backgroundColor: isDark ? '#2A2A2A' : '#FAFAFA'
-                            }}
-                            small={true}
-                        />
-                    </div>
-                    <div
-                        style={{
-                            padding: '12px',
-                            borderBottom: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
-                            flexShrink: 0
-                        }}
-                    >
-                        <Button
-                            icon="plus"
-                            text="New Note"
-                            onClick={this.addNewNote}
-                            fill={true}
-                            intent="primary"
-                            small={true}
-                        />
-                    </div>
-                    <div
-                        style={{
-                            flex: 1,
-                            overflowY: 'auto',
-                            overflowX: 'hidden',
-                            padding: '0'
-                        }}
-                    >
-                        <Menu
-                            style={{
-                                backgroundColor: 'transparent',
-                                padding: '0',
-                                overflow: 'visible'
+                                width: `${leftPanelWidth}%`,
+                                backgroundColor: isDark ? '#000000' : '#FFFFFF',
+                                borderRight: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflow: 'hidden',
+                                flexShrink: 0
                             }}
                         >
-                            {this.renderFolderTree()}
-                            {this.getFilteredNotes().length === 0 && this.state.searchQuery && (
-                                <div style={{
-                                    padding: '40px 20px',
+                            <div
+                                style={{
+                                    height: '35px',
+                                    padding: '8px 12px',
+                                    borderBottom: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
+                                    flexShrink: 0,
+                                    display: 'flex',
+                                    gap: '8px'
+                                }}
+                            >
+                                <InputGroup
+                                    leftIcon="search"
+                                    placeholder="Search notes..."
+                                    value={searchQuery}
+                                    onChange={this.handleSearchChange}
+                                    style={{
+                                        height: '100%',
+                                        backgroundColor: isDark ? '#2A2A2A' : '#FAFAFA',
+                                        flex: 1
+                                    }}
+                                    small={true}
+                                />
+                                <Button
+                                    icon="menu"
+                                    minimal={true}
+                                    onClick={this.toggleLeftPanel}
+                                    small={true}
+                                    title="Hide sidebar"
+                                />
+                            </div>
+                            <div
+                                style={{
+                                    padding: '12px',
+                                    borderBottom: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
+                                    flexShrink: 0
+                                }}
+                            >
+                                <Button
+                                    icon="plus"
+                                    text="New Note"
+                                    onClick={this.addNewNote}
+                                    fill={true}
+                                    intent="primary"
+                                    small={true}
+                                />
+                            </div>
+                            <div
+                                style={{
+                                    flex: 1,
+                                    overflowY: 'auto',
+                                    overflowX: 'hidden',
+                                    padding: '0'
+                                }}
+                            >
+                                <Menu
+                                    style={{
+                                        backgroundColor: 'transparent',
+                                        padding: '0',
+                                        overflow: 'visible'
+                                    }}
+                                >
+                                    {this.renderFolderTree()}
+                                    {this.getFilteredNotes().length === 0 && this.state.searchQuery && (
+                                        <div style={{
+                                            padding: '40px 20px',
+                                            textAlign: 'center',
+                                            color: isDark ? '#8A8A8A' : '#666666'
+                                        }}>
+                                            <Icon
+                                                icon="search"
+                                                iconSize={40}
+                                                style={{ marginBottom: '12px', opacity: 0.5 }}
+                                            />
+                                            <div style={{ fontSize: '14px' }}>
+                                                No matching notes found
+                                            </div>
+                                        </div>
+                                    )}
+                                </Menu>
+                            </div>
+                            <div
+                                style={{
+                                    padding: '12px',
+                                    borderTop: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
+                                    fontSize: '12px',
+                                    color: isDark ? '#8A8A8A' : '#666666',
                                     textAlign: 'center',
-                                    color: isDark ? '#8A8A8A' : '#666666'
+                                    flexShrink: 0
                                 }}>
-                                    <Icon
-                                        icon="search"
-                                        iconSize={40}
-                                        style={{ marginBottom: '12px', opacity: 0.5 }}
-                                    />
-                                    <div style={{ fontSize: '14px' }}>
-                                        No matching notes found
-                                    </div>
-                                </div>
-                            )}
-                        </Menu>
-                    </div>
-                    <div
-                        style={{
-                            padding: '12px',
-                            borderTop: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
-                            fontSize: '12px',
-                            color: isDark ? '#8A8A8A' : '#666666',
-                            textAlign: 'center',
-                            flexShrink: 0
-                        }}>
-                        {this.state.notes.length} notes
-                    </div>
-                </div>
+                                {this.state.notes.length} notes
+                            </div>
+                        </div>
+                        <div
+                            style={{
+                                width: '6px',
+                                backgroundColor: 'transparent',
+                                cursor: 'col-resize',
+                                flexShrink: 0,
+                                position: 'relative',
+                                zIndex: 10
+                            }}
+                            onMouseDown={this.handleResizeStart}
+                        >
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    left: '2px',
+                                    top: 0,
+                                    bottom: 0,
+                                    width: '2px',
+                                    backgroundColor: isDark ? '#333333' : '#E1E1E1'
+                                }}
+                            />
+                        </div>
+                    </>
+                )}
                 <div
                     style={{
                         flex: 1,
                         display: 'flex',
                         flexDirection: 'column',
                         overflow: 'hidden',
-                        backgroundColor: isDark ? '#000000' : '#FFFFFF'
+                        backgroundColor: isDark ? '#000000' : '#FFFFFF',
+                        position: 'relative'
                     }}
                 >
+                    {!isLeftPanelVisible && (
+                        <Button
+                            icon="menu"
+                            minimal={true}
+                            onClick={this.toggleLeftPanel}
+                            style={{
+                                position: 'absolute',
+                                left: '12px',
+                                top: '12px',
+                                zIndex: 10
+                            }}
+                            small={true}
+                            title="Show sidebar"
+                        />
+                    )}
                     <div
                         style={{
                             height: '70px',
                             padding: '16px 24px',
-                            borderBottom: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
-                            display: 'flex',
+                            borderBottom: 'none',
                             alignItems: 'center',
-                            gap: '12px',
-                            flexShrink: 0
+                            flexShrink: 0,
+                            cursor: 'text',
+                            width: '100%',
+                        }}
+                        onClick={() => {
+                            if (this.titleRef.current) {
+                                this.titleRef.current.focus();
+                                const input = this.titleRef.current;
+                                const length = input.value.length;
+                                input.setSelectionRange(length, length);
+                            }
                         }}
                     >
                         <InputGroup
@@ -546,73 +637,18 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                 boxShadow: 'none',
                                 backgroundColor: 'transparent',
                                 padding: '0',
-                                color: isDark ? '#E8E8E8' : '#1A1A1A'
+                                color: isDark ? '#E8E8E8' : '#1A1A1A',
+                                flex: 1,
+                                cursor: 'text',
+                                width: '100%',
                             }}
                             large={true}
                         />
-                        {activeNote && (
-                            <div style={{
-                                marginLeft: 'auto',
-                                display: 'flex',
-                                gap: '8px',
-                                alignItems: 'center'
-                            }}>
-                                <div style={{
-                                    fontSize: '12px',
-                                    color: isDark ? '#8A8A8A' : '#666666'
-                                }}>
-                                    Last updated: {this.formatDate(activeNote.updatedAt)}
-                                </div>
-                                <Button
-                                    icon="trash"
-                                    minimal={true}
-                                    onClick={() => this.requestDeleteNote(activeNote.id)}
-                                    intent="danger"
-                                    small={true}
-                                />
-                            </div>
-                        )}
                     </div>
-                    {activeNote?.tags && activeNote.tags.length > 0 && (
-                        <div
-                            style={{
-                                padding: '8px 24px',
-                                borderBottom: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
-                                display: 'flex',
-                                gap: '8px',
-                                flexShrink: 0
-                            }}
-                        >
-                            {activeNote.tags.map(tag => (
-                                <div
-                                    key={tag}
-                                    style={{
-                                        backgroundColor: isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)',
-                                        color: isDark ? '#48AFF0' : '#137CBD',
-                                        padding: '2px 8px',
-                                        borderRadius: '3px',
-                                        fontSize: '12px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '4px'
-                                    }}
-                                >
-                                    <Icon icon="tag" iconSize={10} />
-                                    {tag}
-                                    <Icon
-                                        icon="cross"
-                                        iconSize={10}
-                                        style={{ cursor: 'pointer' }}
-                                        onClick={() => this.removeTagFromNote(activeNote.id, tag)}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    )}
                     <div
                         style={{
                             flex: 1,
-                            padding: '24px',
+                            padding: '0px',
                             overflow: 'auto',
                             backgroundColor: isDark ? '#000000' : '#FFFFFF'
                         }}
@@ -623,6 +659,8 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                             value={activeNote?.content || ''}
                             onChange={this.handleContentChange}
                             style={{
+                                paddingLeft: '25px',
+                                paddingRight: '25px',
                                 width: '100%',
                                 height: '100%',
                                 minHeight: '400px',
@@ -631,35 +669,14 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                 fontFamily: "'Segoe UI', 'Roboto', sans-serif",
                                 backgroundColor: 'transparent',
                                 border: 'none',
+                                outline: 'none',
+                                boxShadow: 'none',
                                 resize: 'none',
                                 color: isDark ? '#CCCCCC' : '#333333'
                             }}
                             fill={true}
                             growVertically={true}
                         />
-                    </div>
-                    <div
-                        style={{
-                            height: '30px',
-                            padding: '0 24px',
-                            borderTop: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            fontSize: '11px',
-                            color: isDark ? '#8A8A8A' : '#666666',
-                            flexShrink: 0
-                        }}
-                    >
-                        <div>
-                            {activeNote ? (
-                                <>Created: {activeNote.createdAt.toLocaleDateString()}</>
-                            ) : null}
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Icon icon="floppy-disk" iconSize={10} />
-                            Auto-save enabled
-                        </div>
                     </div>
                 </div>
                 <Dialog

@@ -659,7 +659,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                     backgroundColor: isDark ? '#000000' : '#FFFFFF',
                     position: 'relative',
                     flexShrink: 0,
-                    borderRight: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
                 }}
                 onMouseMove={this.handleContentMouseMove}
                 onMouseLeave={this.handleTextAreaMouseLeave}
@@ -922,17 +921,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                         </div>
                                     )}
                                 </Menu>
-                            </div>
-                            <div
-                                style={{
-                                    padding: '12px',
-                                    borderTop: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
-                                    fontSize: '12px',
-                                    color: isDark ? '#8A8A8A' : '#666666',
-                                    textAlign: 'center',
-                                    flexShrink: 0
-                                }}>
-                                {this.state.notes.length} notes
                             </div>
                         </div>
                         <div

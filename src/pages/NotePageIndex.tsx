@@ -39,6 +39,7 @@ interface NotePageIndexState {
     leftPanelWidth: number;
     isLeftPanelVisible: boolean;
     isResizing: boolean;
+    hoveredFolderId: string | null;
 }
 
 class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexState> {
@@ -134,7 +135,8 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             expandedFolders: new Set(['folder1', 'folder2', 'folder3', 'folder4']),
             leftPanelWidth: this.LEFT_MIN_WIDTH,
             isLeftPanelVisible: true,
-            isResizing: false
+            isResizing: false,
+            hoveredFolderId: null
         };
     }
 
@@ -151,6 +153,21 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         this.cleanupAutoSave();
         this.cleanupResizeListeners();
     }
+
+    private getMenuItemClassName = (isActive: boolean = false): string => {
+        const { theme } = this.state;
+        const isDark = theme === 'dark';
+        let className = 'custom-menu-item';
+        if (isActive) {
+            className += ' custom-menu-item-active';
+            if (isDark) {
+                className += ' custom-menu-item-active-dark';
+            } else {
+                className += ' custom-menu-item-active-light';
+            }
+        }
+        return className;
+    };
 
     private handleThemeChange = (theme: 'dark' | 'light'): void => {
         this.setState({ theme });
@@ -335,8 +352,31 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         this.setState({ isResizing: false });
     };
 
+    private handleFolderMouseEnter = (folderId: string): void => {
+        this.setState({ hoveredFolderId: folderId });
+    };
+
+    private handleFolderMouseLeave = (): void => {
+        this.setState({ hoveredFolderId: null });
+    };
+
+    private getHoverBackgroundColor = (): string => {
+        const { theme } = this.state;
+        const isDark = theme === 'dark';
+        return isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+    };
+
+    private getActiveBackgroundColor = (): string => {
+        const { theme } = this.state;
+        const isDark = theme === 'dark';
+        return isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)';
+    };
+
+    private handleNoteMouseEnter = (noteId: string): void => {
+    };
+
     private renderFolderTree = (parentId: string | null = null, level: number = 0): React.ReactNode => {
-        const { theme, expandedFolders, activeNoteId } = this.state;
+        const { theme, expandedFolders, activeNoteId, hoveredFolderId } = this.state;
         const isDark = theme === 'dark';
         const folders = this.getFoldersByParentId(parentId);
         return folders.map(folder => {
@@ -344,73 +384,119 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             const notes = this.getNotesByFolderId(folder.id);
             const isExpanded = expandedFolders.has(folder.id);
             const hasChildren = childFolders.length > 0 || notes.length > 0;
+            const isHovered = hoveredFolderId === folder.id;
             return (
                 <React.Fragment key={folder.id}>
                     <MenuItem
                         icon={hasChildren ? (isExpanded ? "folder-open" : "folder-close") : "folder-close"}
                         text={
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                width: '100%'
-                            }}>
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    width: '100%',
+                                    position: 'relative'
+                                }}
+                                onMouseEnter={() => this.handleFolderMouseEnter(folder.id)}
+                                onMouseLeave={this.handleFolderMouseLeave}
+                            >
                                 <span style={{
                                     flex: 1,
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap'
+                                    whiteSpace: 'nowrap',
+                                    paddingRight: '24px',
+                                    color: isHovered ? (isDark ? '#48AFF0' : '#137CBD') : 'inherit'
                                 }}>
                                     {folder.name}
                                 </span>
+                                {isHovered && (
+                                    <Button
+                                        icon="plus"
+                                        minimal={true}
+                                        small={true}
+                                        style={{
+                                            padding: '2px',
+                                            minHeight: '18px',
+                                            minWidth: '18px',
+                                            opacity: 0.7,
+                                            position: 'absolute',
+                                            right: '4px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)'
+                                        }}
+                                        title="Add note to this folder"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                        }}
+                                    />
+                                )}
                             </div>
                         }
                         onClick={() => this.toggleFolder(folder.id)}
+                        active={false}
                         style={{
                             paddingLeft: `${16 + level * 20}px`,
-                            backgroundColor: 'transparent'
+                            backgroundColor: 'transparent',
                         }}
-                        active={false}
                     />
                     {isExpanded && (
                         <>
                             {this.renderFolderTree(folder.id, level + 1)}
-                            {notes.map(note => (
-                                <MenuItem
-                                    key={note.id}
-                                    icon="document"
-                                    text={
-                                        <div style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            width: '100%'
-                                        }}>
-                                            <span style={{
-                                                flex: 1,
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap',
-                                                fontSize: '12px',
-                                                fontWeight: note.id === activeNoteId ? '600' : '400'
-                                            }}>
-                                                {note.title || 'Untitled'}
-                                            </span>
-                                        </div>
-                                    }
-                                    onClick={() => this.handleNoteSelect(note.id)}
-                                    active={note.id === activeNoteId}
-                                    style={{
-                                        paddingLeft: `${16 + (level + 1) * 20}px`,
-                                        backgroundColor: note.id === activeNoteId
-                                            ? (isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)')
-                                            : 'transparent',
-                                        borderLeft: note.id === activeNoteId
-                                            ? `3px solid ${isDark ? '#48AFF0' : '#137CBD'}`
-                                            : '3px solid transparent'
-                                    }}
-                                />
-                            ))}
+                            {notes.map(note => {
+                                const isNoteActive = note.id === activeNoteId;
+                                return (
+                                    <MenuItem
+                                        key={note.id}
+                                        icon="document"
+                                        text={
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    width: '100%'
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    const span = e.currentTarget.querySelector('span');
+                                                    if (span) {
+                                                        span.style.color = isDark ? '#48AFF0' : '#137CBD';
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    const span = e.currentTarget.querySelector('span');
+                                                    if (span) {
+                                                        span.style.color = isNoteActive ? (isDark ? '#48AFF0' : '#137CBD') : 'inherit';
+                                                    }
+                                                }}
+                                            >
+                                                <span style={{
+                                                    flex: 1,
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                    fontSize: '12px',
+                                                    fontWeight: isNoteActive ? '600' : '400',
+                                                    color: isNoteActive ? (isDark ? '#48AFF0' : '#137CBD') : 'inherit',
+                                                    transition: 'color 0.2s ease'
+                                                }}>
+                                                    {note.title || 'Untitled'}
+                                                </span>
+                                            </div>
+                                        }
+                                        onClick={() => this.handleNoteSelect(note.id)}
+                                        active={isNoteActive}
+                                        style={{
+                                            paddingLeft: `${16 + (level + 1) * 20}px`,
+                                            backgroundColor: 'transparent',
+                                            borderLeft: isNoteActive
+                                                ? `3px solid ${isDark ? '#48AFF0' : '#137CBD'}`
+                                                : '3px solid transparent',
+                                        }}
+                                    />
+                                );
+                            })}
                         </>
                     )}
                 </React.Fragment>
@@ -419,14 +505,71 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     };
 
     private getFilteredNotes = () => {
-        const { notes, searchQuery } = this.state;
-        if (!searchQuery.trim()) return [];
+        const { notes, searchQuery, theme, activeNoteId } = this.state;
+        if (!searchQuery.trim()) return null;
         const query = searchQuery.toLowerCase();
-        return notes.filter(note =>
+        const isDark = theme === 'dark';
+        const filteredNotes = notes.filter(note =>
             note.title.toLowerCase().includes(query) ||
             note.content.toLowerCase().includes(query) ||
             note.tags.some(tag => tag.toLowerCase().includes(query))
         );
+        if (filteredNotes.length === 0) {
+            return null;
+        }
+        return filteredNotes.map(note => {
+            const isNoteActive = note.id === activeNoteId;
+            return (
+                <MenuItem
+                    key={note.id}
+                    icon="document"
+                    text={
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                width: '100%'
+                            }}
+                            onMouseEnter={(e) => {
+                                const span = e.currentTarget.querySelector('span');
+                                if (span) {
+                                    span.style.color = isDark ? '#48AFF0' : '#137CBD';
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                const span = e.currentTarget.querySelector('span');
+                                if (span) {
+                                    span.style.color = isNoteActive ? (isDark ? '#48AFF0' : '#137CBD') : 'inherit';
+                                }
+                            }}
+                        >
+                            <span style={{
+                                flex: 1,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                fontSize: '12px',
+                                fontWeight: isNoteActive ? '600' : '400',
+                                color: isNoteActive ? (isDark ? '#48AFF0' : '#137CBD') : 'inherit',
+                                transition: 'color 0.2s ease'
+                            }}>
+                                {note.title || 'Untitled'}
+                            </span>
+                        </div>
+                    }
+                    onClick={() => this.handleNoteSelect(note.id)}
+                    active={isNoteActive}
+                    style={{
+                        paddingLeft: '16px',
+                        backgroundColor: 'transparent',
+                        borderLeft: isNoteActive
+                            ? `3px solid ${isDark ? '#48AFF0' : '#137CBD'}`
+                            : '3px solid transparent',
+                    }}
+                />
+            );
+        });
     };
 
     private getActiveNote = () => {
@@ -452,6 +595,43 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                     cursor: isResizing ? 'col-resize' : 'default'
                 }}
             >
+                <style>
+                    {`
+                    .custom-menu-item {
+                        border-radius: 4px;
+                        margin: 2px 4px;
+                        transition: background-color 0.2s ease;
+                        cursor: pointer;
+                    }
+                    .custom-menu-item:hover {
+                        background-color: rgba(0, 0, 0, 0.05);
+                    }
+                    .custom-menu-item-active {
+                        border-left: 3px solid #137CBD;
+                    }
+                    .custom-menu-item-active-dark {
+                        background-color: rgba(72, 175, 240, 0.2);
+                    }
+                    .custom-menu-item-active-light {
+                        background-color: rgba(19, 124, 189, 0.1);
+                    }
+                    .custom-menu-item-active:hover {
+                        background-color: rgba(19, 124, 189, 0.15);
+                    }
+                    .bp4-dark .custom-menu-item:hover {
+                        background-color: rgba(255, 255, 255, 0.1);
+                    }
+                    .bp4-dark .custom-menu-item-active {
+                        border-left: 3px solid #48AFF0;
+                    }
+                    .bp4-dark .custom-menu-item-active-dark {
+                        background-color: rgba(72, 175, 240, 0.2);
+                    }
+                    .bp4-dark .custom-menu-item-active:hover {
+                        background-color: rgba(72, 175, 240, 0.3);
+                    }
+                `}
+                </style>
                 {isLeftPanelVisible && (
                     <>
                         <div
@@ -483,7 +663,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                         border: 'none'
                                     }}
                                 />
-
                             </div>
                             <div
                                 style={{
@@ -517,20 +696,20 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                     }}
                                 >
                                     {this.renderFolderTree()}
-                                    {this.getFilteredNotes().length === 0 && this.state.searchQuery && (
-                                        <div style={{
-                                            padding: '40px 20px',
-                                            textAlign: 'center',
-                                            color: isDark ? '#8A8A8A' : '#666666'
-                                        }}>
-                                            <Icon
-                                                icon="search"
-                                                iconSize={40}
-                                                style={{ marginBottom: '12px', opacity: 0.5 }}
-                                            />
-                                            <div style={{ fontSize: '14px' }}>
-                                                No matching notes found
+                                    {this.getFilteredNotes() && (
+                                        <div style={{ padding: '4px 0' }}>
+                                            <div style={{
+                                                padding: '8px 12px',
+                                                fontSize: '11px',
+                                                color: isDark ? '#8A8A8A' : '#666666',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.5px'
+                                            }}>
+                                                Search Results
                                             </div>
+                                            <Menu style={{ backgroundColor: 'transparent', padding: '0' }}>
+                                                {this.getFilteredNotes()}
+                                            </Menu>
                                         </div>
                                     )}
                                 </Menu>
@@ -637,13 +816,10 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                 const getFolderPath = (folderId: string, path: string[] = []): string[] => {
                                     const currentFolder = this.state.folders.find(f => f.id === folderId);
                                     if (!currentFolder) return path;
-
                                     const newPath = [currentFolder.name, ...path];
-
                                     if (currentFolder.parentId) {
                                         return getFolderPath(currentFolder.parentId, newPath);
                                     }
-
                                     return newPath;
                                 };
                                 const folderPath = getFolderPath(activeNote.folderId);

@@ -597,39 +597,76 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             >
                 <style>
                     {`
-                    .custom-menu-item {
-                        border-radius: 4px;
-                        margin: 2px 4px;
-                        transition: background-color 0.2s ease;
-                        cursor: pointer;
-                    }
-                    .custom-menu-item:hover {
-                        background-color: rgba(0, 0, 0, 0.05);
-                    }
-                    .custom-menu-item-active {
-                        border-left: 3px solid #137CBD;
-                    }
-                    .custom-menu-item-active-dark {
-                        background-color: rgba(72, 175, 240, 0.2);
-                    }
-                    .custom-menu-item-active-light {
-                        background-color: rgba(19, 124, 189, 0.1);
-                    }
-                    .custom-menu-item-active:hover {
-                        background-color: rgba(19, 124, 189, 0.15);
-                    }
-                    .bp4-dark .custom-menu-item:hover {
-                        background-color: rgba(255, 255, 255, 0.1);
-                    }
-                    .bp4-dark .custom-menu-item-active {
-                        border-left: 3px solid #48AFF0;
-                    }
-                    .bp4-dark .custom-menu-item-active-dark {
-                        background-color: rgba(72, 175, 240, 0.2);
-                    }
-                    .bp4-dark .custom-menu-item-active:hover {
-                        background-color: rgba(72, 175, 240, 0.3);
-                    }
+                .left-panel-scroll::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .left-panel-scroll::-webkit-scrollbar-track {
+                    background: ${isDark ? '#1A1A1A' : '#F5F5F5'};
+                    border-radius: 4px;
+                }
+                .left-panel-scroll::-webkit-scrollbar-thumb {
+                    background: ${isDark ? '#555555' : '#CCCCCC'};
+                    border-radius: 4px;
+                }
+                .left-panel-scroll::-webkit-scrollbar-thumb:hover {
+                    background: ${isDark ? '#666666' : '#BBBBBB'};
+                }
+                .right-content-scroll::-webkit-scrollbar {
+                    width: 8px;
+                }
+                .right-content-scroll::-webkit-scrollbar-track {
+                    background: ${isDark ? '#0A0A0A' : '#F0F0F0'};
+                    border-radius: 5px;
+                }
+                .right-content-scroll::-webkit-scrollbar-thumb {
+                    background: ${isDark ? '#444444' : '#DDDDDD'};
+                    border-radius: 5px;
+                    border: 2px solid ${isDark ? '#0A0A0A' : '#F0F0F0'};
+                }
+                .right-content-scroll::-webkit-scrollbar-thumb:hover {
+                    background: ${isDark ? '#555555' : '#CCCCCC'};
+                }
+                .left-panel-scroll {
+                    scrollbar-width: thin;
+                    scrollbar-color: ${isDark ? '#555555 #1A1A1A' : '#CCCCCC #F5F5F5'};
+                }
+                .right-content-scroll {
+                    scrollbar-width: thin;
+                    scrollbar-color: ${isDark ? '#444444 #0A0A0A' : '#DDDDDD #F0F0F0'};
+                }
+                .custom-menu-item {
+                    border-radius: 4px;
+                    margin: 2px 4px;
+                    transition: background-color 0.2s ease;
+                    cursor: pointer;
+                }
+                .custom-menu-item:hover {
+                    background-color: rgba(0, 0, 0, 0.05);
+                }
+                .custom-menu-item-active {
+                    border-left: 3px solid #137CBD;
+                }
+                .custom-menu-item-active-dark {
+                    background-color: rgba(72, 175, 240, 0.2);
+                }
+                .custom-menu-item-active-light {
+                    background-color: rgba(19, 124, 189, 0.1);
+                }
+                .custom-menu-item-active:hover {
+                    background-color: rgba(19, 124, 189, 0.15);
+                }
+                .bp4-dark .custom-menu-item:hover {
+                    background-color: rgba(255, 255, 255, 0.1);
+                }
+                .bp4-dark .custom-menu-item-active {
+                    border-left: 3px solid #48AFF0;
+                }
+                .bp4-dark .custom-menu-item-active-dark {
+                    background-color: rgba(72, 175, 240, 0.2);
+                }
+                .bp4-dark .custom-menu-item-active:hover {
+                    background-color: rgba(72, 175, 240, 0.3);
+                }
                 `}
                 </style>
                 {isLeftPanelVisible && (
@@ -687,6 +724,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                     overflowX: 'hidden',
                                     padding: '0'
                                 }}
+                                className="left-panel-scroll"
                             >
                                 <Menu
                                     style={{
@@ -759,6 +797,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                         backgroundColor: isDark ? '#000000' : '#FFFFFF',
                         position: 'relative'
                     }}
+                    className="right-content-scroll"
                 >
                     <div
                         style={{
@@ -924,6 +963,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                             }}
                             fill={true}
                             growVertically={true}
+                            className="right-content-scroll"
                         />
                     </div>
                 </div>

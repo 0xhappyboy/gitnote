@@ -40,6 +40,12 @@ interface NotePageIndexState {
     isLeftPanelVisible: boolean;
     isResizing: boolean;
     hoveredFolderId: string | null;
+    hoveredLineNumber: number | null;
+    visibleLineButtons: Set<number>;
+    isDragging: boolean;
+    dragStartY: number;
+    dragLineNumber: number | null;
+    dragIndicatorPosition: number | null;
 }
 
 class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexState> {
@@ -48,8 +54,11 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     private titleRef = React.createRef<HTMLInputElement>();
     private autoSaveInterval: NodeJS.Timeout | null = null;
     private containerRef = React.createRef<HTMLDivElement>();
+    private textAreaContainerRef = React.createRef<HTMLDivElement>();
     private LEFT_MIN_WIDTH = 20;
     private MAX_WIDTH = 50;
+    private LINE_HEIGHT = 22;
+    private DRAG_THRESHOLD = 5;
 
     constructor(props: NotePageIndexProps) {
         super(props);
@@ -136,7 +145,13 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             leftPanelWidth: this.LEFT_MIN_WIDTH,
             isLeftPanelVisible: true,
             isResizing: false,
-            hoveredFolderId: null
+            hoveredFolderId: null,
+            hoveredLineNumber: null,
+            visibleLineButtons: new Set<number>(),
+            isDragging: false,
+            dragStartY: 0,
+            dragLineNumber: null,
+            dragIndicatorPosition: null
         };
     }
 
@@ -144,6 +159,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         this.unsubscribe = themeManager.subscribe(this.handleThemeChange);
         this.setupAutoSave();
         this.setupResizeListeners();
+        this.setupDragListeners();
     }
 
     componentWillUnmount() {
@@ -152,22 +168,8 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         }
         this.cleanupAutoSave();
         this.cleanupResizeListeners();
+        this.cleanupDragListeners();
     }
-
-    private getMenuItemClassName = (isActive: boolean = false): string => {
-        const { theme } = this.state;
-        const isDark = theme === 'dark';
-        let className = 'custom-menu-item';
-        if (isActive) {
-            className += ' custom-menu-item-active';
-            if (isDark) {
-                className += ' custom-menu-item-active-dark';
-            } else {
-                className += ' custom-menu-item-active-light';
-            }
-        }
-        return className;
-    };
 
     private handleThemeChange = (theme: 'dark' | 'light'): void => {
         this.setState({ theme });
@@ -192,8 +194,93 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
 
         const activeNote = notes.find(note => note.id === activeNoteId);
         if (activeNote) {
-            console.log('Auto-saving note:', activeNote.title);
         }
+    };
+
+    private setupDragListeners = (): void => {
+        document.addEventListener('mousemove', this.handleDragMove);
+        document.addEventListener('mouseup', this.handleDragEnd);
+    };
+
+    private cleanupDragListeners = (): void => {
+        document.removeEventListener('mousemove', this.handleDragMove);
+        document.removeEventListener('mouseup', this.handleDragEnd);
+    };
+
+    private handleDragStart = (e: React.MouseEvent, lineNumber: number): void => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.setState({
+            isDragging: true,
+            dragStartY: e.clientY,
+            dragLineNumber: lineNumber,
+            dragIndicatorPosition: (lineNumber - 1) * this.LINE_HEIGHT
+        });
+        document.body.style.cursor = 'grabbing';
+        document.body.style.userSelect = 'none';
+    };
+
+    private handleDragMove = (e: MouseEvent): void => {
+        const { isDragging, dragStartY, dragLineNumber } = this.state;
+        if (!isDragging || dragLineNumber === null) return;
+        const deltaY = e.clientY - dragStartY;
+        if (Math.abs(deltaY) > this.DRAG_THRESHOLD) {
+            const newPosition = (dragLineNumber - 1) * this.LINE_HEIGHT + deltaY;
+            this.setState({
+                dragIndicatorPosition: Math.max(0, newPosition)
+            });
+        }
+    };
+
+    private handleDragEnd = (e: MouseEvent): void => {
+        const { isDragging, dragLineNumber, dragIndicatorPosition, activeNoteId, notes } = this.state;
+        if (!isDragging || dragLineNumber === null || dragIndicatorPosition === null) {
+            this.resetDragState();
+            return;
+        }
+        const targetLineNumber = Math.round(dragIndicatorPosition / this.LINE_HEIGHT) + 1;
+        if (targetLineNumber !== dragLineNumber && activeNoteId) {
+            this.moveLine(dragLineNumber, targetLineNumber);
+        }
+        this.resetDragState();
+    };
+
+    private resetDragState = (): void => {
+        this.setState({
+            isDragging: false,
+            dragStartY: 0,
+            dragLineNumber: null,
+            dragIndicatorPosition: null
+        });
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+    };
+
+    private moveLine = (fromLine: number, toLine: number): void => {
+        const { activeNoteId, notes } = this.state;
+        if (!activeNoteId) return;
+        const activeNoteIndex = notes.findIndex(note => note.id === activeNoteId);
+        if (activeNoteIndex === -1) return;
+        const activeNote = notes[activeNoteIndex];
+        const lines = activeNote.content.split('\n');
+        const adjustedFromLine = Math.max(1, Math.min(fromLine, lines.length));
+        const adjustedToLine = Math.max(1, Math.min(toLine, lines.length + 1));
+        if (adjustedFromLine === adjustedToLine) return;
+        const lineToMove = lines[adjustedFromLine - 1];
+        lines.splice(adjustedFromLine - 1, 1);
+        lines.splice(adjustedToLine - (adjustedToLine > adjustedFromLine ? 0 : 1), 0, lineToMove);
+        const updatedContent = lines.join('\n');
+        this.setState(prevState => ({
+            notes: prevState.notes.map((note, index) =>
+                index === activeNoteIndex
+                    ? {
+                        ...note,
+                        content: updatedContent,
+                        updatedAt: new Date()
+                    }
+                    : note
+            )
+        }));
     };
 
     private handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
@@ -207,7 +294,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     private handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
         const { activeNoteId } = this.state;
         if (!activeNoteId) return;
-
         this.setState(prevState => ({
             notes: prevState.notes.map(note =>
                 note.id === activeNoteId
@@ -251,13 +337,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         }, 100);
     };
 
-    private requestDeleteNote = (noteId: string): void => {
-        this.setState({
-            isDeleteDialogOpen: true,
-            noteToDelete: noteId
-        });
-    };
-
     private confirmDeleteNote = (): void => {
         const { noteToDelete } = this.state;
         if (!noteToDelete) return;
@@ -298,19 +377,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         this.setState(prevState => ({
             isLeftPanelVisible: !prevState.isLeftPanelVisible
         }));
-    };
-
-    private formatDate = (date: Date): string => {
-        const now = new Date();
-        const diff = now.getTime() - date.getTime();
-        const diffDays = Math.floor(diff / (1000 * 60 * 60 * 24));
-        if (diffDays === 0) {
-            return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        } else if (diffDays < 7) {
-            return `${diffDays}d ago`;
-        } else {
-            return date.toLocaleDateString('en-US');
-        }
     };
 
     private getFoldersByParentId = (parentId: string | null) => {
@@ -360,19 +426,22 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         this.setState({ hoveredFolderId: null });
     };
 
-    private getHoverBackgroundColor = (): string => {
-        const { theme } = this.state;
-        const isDark = theme === 'dark';
-        return isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+    private handleContentMouseMove = (e: React.MouseEvent<HTMLDivElement>): void => {
+        const { isDragging } = this.state;
+        if (isDragging) return;
+        const contentArea = e.currentTarget;
+        const rect = contentArea.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const lineNumber = Math.max(1, Math.floor(y / this.LINE_HEIGHT) + 1);
+        this.setState({
+            hoveredLineNumber: lineNumber
+        });
     };
 
-    private getActiveBackgroundColor = (): string => {
-        const { theme } = this.state;
-        const isDark = theme === 'dark';
-        return isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)';
-    };
-
-    private handleNoteMouseEnter = (noteId: string): void => {
+    private handleTextAreaMouseLeave = (): void => {
+        if (!this.state.isDragging) {
+            this.setState({ hoveredLineNumber: null });
+        }
     };
 
     private renderFolderTree = (parentId: string | null = null, level: number = 0): React.ReactNode => {
@@ -577,8 +646,110 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         return notes.find(note => note.id === activeNoteId) || notes[0];
     };
 
+    private renderLineNumbers = () => {
+        const { theme, hoveredLineNumber, isDragging, dragIndicatorPosition } = this.state;
+        const isDark = theme === 'dark';
+        const activeNote = this.getActiveNote();
+        const lineCount = activeNote ? activeNote.content.split('\n').length + 1 : 1;
+        return (
+            <div
+                style={{
+                    width: '60px',
+                    height: '100%',
+                    backgroundColor: isDark ? '#000000' : '#FFFFFF',
+                    position: 'relative',
+                    flexShrink: 0,
+                    borderRight: `1px solid ${isDark ? '#333333' : '#E1E1E1'}`,
+                }}
+                onMouseMove={this.handleContentMouseMove}
+                onMouseLeave={this.handleTextAreaMouseLeave}
+            >
+                {dragIndicatorPosition !== null && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: `${dragIndicatorPosition}px`,
+                            left: 0,
+                            right: 0,
+                            height: '2px',
+                            backgroundColor: isDark ? '#48AFF0' : '#137CBD',
+                            zIndex: 1000,
+                            pointerEvents: 'none'
+                        }}
+                    />
+                )}
+                {hoveredLineNumber && !isDragging && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: `${Math.max(0, (hoveredLineNumber - 1) * this.LINE_HEIGHT)}px`,
+                            display: 'flex',
+                            gap: '2px',
+                            zIndex: 100,
+                            right: '8px',
+                            alignItems: 'center',
+                            height: `${this.LINE_HEIGHT}px`
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                    >
+                        <Button
+                            icon="plus"
+                            minimal
+                            small
+                            style={{
+                                padding: '2px',
+                                minWidth: '20px',
+                                minHeight: '20px',
+                                border: 'none',
+                                outline: 'none',
+                                boxShadow: 'none',
+                                opacity: 0.7
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                            }}
+                            onFocus={(e) => {
+                                e.stopPropagation();
+                                e.currentTarget.blur();
+                            }}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                        />
+                        <Button
+                            icon="drag-handle-vertical"
+                            minimal
+                            small
+                            style={{
+                                padding: '2px',
+                                minWidth: '20px',
+                                minHeight: '20px',
+                                border: 'none',
+                                outline: 'none',
+                                boxShadow: 'none',
+                                cursor: 'grab',
+                                opacity: 0.7
+                            }}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                this.handleDragStart(e, hoveredLineNumber);
+                            }}
+                            onFocus={(e) => {
+                                e.stopPropagation();
+                                e.currentTarget.blur();
+                            }}
+                            title="Drag to reorder line"
+                        />
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     render() {
-        const { theme, searchQuery, isDeleteDialogOpen, leftPanelWidth, isLeftPanelVisible, isResizing } = this.state;
+        const { theme, searchQuery, isDeleteDialogOpen, leftPanelWidth, isLeftPanelVisible, isResizing, isDragging, dragIndicatorPosition } = this.state;
         const activeNote = this.getActiveNote();
         const isDark = theme === 'dark';
         return (
@@ -592,7 +763,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                     display: 'flex',
                     position: 'relative',
                     overflow: 'hidden',
-                    cursor: isResizing ? 'col-resize' : 'default'
+                    cursor: isResizing ? 'col-resize' : (isDragging ? 'grabbing' : 'default')
                 }}
             >
                 <style>
@@ -789,6 +960,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                     </>
                 )}
                 <div
+                    ref={this.textAreaContainerRef}
                     style={{
                         flex: 1,
                         display: 'flex',
@@ -823,14 +995,12 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                             minimal={true}
                             small={true}
                             title="Previous"
-                            onClick={() => console.log('Previous clicked')}
                         />
                         <Button
                             icon="chevron-right"
                             minimal={true}
                             small={true}
                             title="Next"
-                            onClick={() => console.log('Next clicked')}
                         />
                         <div style={{
                             height: '16px',
@@ -902,6 +1072,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                             flexShrink: 0,
                             cursor: 'text',
                             width: '100%',
+                            paddingLeft: '60px'
                         }}
                         onClick={() => {
                             if (this.titleRef.current) {
@@ -935,36 +1106,77 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                     <div
                         style={{
                             flex: 1,
-                            padding: '0px',
-                            overflow: 'auto',
-                            backgroundColor: isDark ? '#000000' : '#FFFFFF'
+                            display: 'flex',
+                            flexDirection: 'row',
+                            overflow: 'hidden',
+                            position: 'relative'
                         }}
                     >
-                        <TextArea
-                            inputRef={this.contentRef}
-                            placeholder="Start typing note content...\nSupports Markdown format"
-                            value={activeNote?.content || ''}
-                            onChange={this.handleContentChange}
+                        {this.renderLineNumbers()}
+                        <div
                             style={{
-                                paddingLeft: '25px',
-                                paddingRight: '25px',
-                                width: '100%',
-                                height: '100%',
-                                minHeight: '400px',
-                                fontSize: '14px',
-                                lineHeight: '1.6',
-                                fontFamily: "'Segoe UI', 'Roboto', sans-serif",
-                                backgroundColor: 'transparent',
-                                border: 'none',
-                                outline: 'none',
-                                boxShadow: 'none',
-                                resize: 'none',
-                                color: isDark ? '#CCCCCC' : '#333333'
+                                flex: 1,
+                                padding: '0',
+                                overflow: 'auto',
+                                backgroundColor: isDark ? '#000000' : '#FFFFFF',
+                                position: 'relative'
                             }}
-                            fill={true}
-                            growVertically={true}
-                            className="right-content-scroll"
-                        />
+                            onMouseMove={this.handleContentMouseMove}
+                            onMouseLeave={this.handleTextAreaMouseLeave}
+                        >
+                            {dragIndicatorPosition !== null && (
+                                <div
+                                    style={{
+                                        position: 'absolute',
+                                        top: `${dragIndicatorPosition}px`,
+                                        left: '0',
+                                        right: '0',
+                                        height: '2px',
+                                        backgroundColor: isDark ? '#48AFF0' : '#137CBD',
+                                        zIndex: 1000,
+                                        pointerEvents: 'none'
+                                    }}
+                                />
+                            )}
+                            {isDragging && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    zIndex: 999,
+                                    cursor: 'grabbing'
+                                }} />
+                            )}
+                            <TextArea
+                                inputRef={this.contentRef}
+                                placeholder="Start typing note content...\nSupports Markdown format"
+                                value={activeNote?.content || ''}
+                                onChange={this.handleContentChange}
+                                style={{
+                                    paddingTop: '0',
+                                    paddingBottom: '0',
+                                    width: '100%',
+                                    height: '100%',
+                                    minHeight: 'calc(100vh - 120px)',
+                                    fontSize: '14px',
+                                    lineHeight: `${this.LINE_HEIGHT}px`,
+                                    fontFamily: "'Segoe UI', 'Roboto', sans-serif",
+                                    backgroundColor: 'transparent',
+                                    border: 'none',
+                                    outline: 'none',
+                                    boxShadow: 'none',
+                                    resize: 'none',
+                                    color: isDark ? '#CCCCCC' : '#333333',
+                                    paddingLeft: '12px',
+                                    paddingRight: '12px'
+                                }}
+                                fill={true}
+                                growVertically={true}
+                                className="right-content-scroll"
+                            />
+                        </div>
                     </div>
                 </div>
                 <Dialog

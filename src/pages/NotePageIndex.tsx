@@ -7,7 +7,9 @@ import {
     MenuItem,
     Icon,
     Classes,
-    Dialog
+    Dialog,
+    Popover,
+    Position
 } from '@blueprintjs/core';
 import { themeManager } from '../globals/theme/ThemeManager';
 
@@ -46,6 +48,14 @@ interface NotePageIndexState {
     dragStartY: number;
     dragLineNumber: number | null;
     dragIndicatorPosition: number | null;
+    isFormatMenuOpen: boolean;
+    isTableGridOpen: boolean;
+    tableGridPosition: { x: number; y: number } | null;
+    tableHoveredRows: number;
+    tableHoveredCols: number;
+    tableSelectedRows: number;
+    tableSelectedCols: number;
+    isSelectingTable: boolean;
 }
 
 class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexState> {
@@ -59,6 +69,11 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     private MAX_WIDTH = 50;
     private LINE_HEIGHT = 22;
     private DRAG_THRESHOLD = 5;
+    private tableGridRef = React.createRef<HTMLDivElement>();
+    private TABLE_CELL_SIZE = 24;
+    private TABLE_GRID_PADDING = 8;
+    private TABLE_MAX_ROWS = 8;
+    private TABLE_MAX_COLS = 8;
 
     constructor(props: NotePageIndexProps) {
         super(props);
@@ -151,7 +166,15 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             isDragging: false,
             dragStartY: 0,
             dragLineNumber: null,
-            dragIndicatorPosition: null
+            dragIndicatorPosition: null,
+            isFormatMenuOpen: false,
+            isTableGridOpen: false,
+            tableGridPosition: null,
+            tableHoveredRows: 0,
+            tableHoveredCols: 0,
+            tableSelectedRows: 0,
+            tableSelectedCols: 0,
+            isSelectingTable: false
         };
     }
 
@@ -160,6 +183,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         this.setupAutoSave();
         this.setupResizeListeners();
         this.setupDragListeners();
+        document.addEventListener('click', this.handleGlobalClick);
     }
 
     componentWillUnmount() {
@@ -169,7 +193,159 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         this.cleanupAutoSave();
         this.cleanupResizeListeners();
         this.cleanupDragListeners();
+        document.removeEventListener('click', this.handleGlobalClick);
     }
+
+    private handleGlobalClick = (e: MouseEvent): void => {
+        const { isFormatMenuOpen, isTableGridOpen } = this.state;
+        const formatMenu = document.querySelector('.popover-scroll');
+        const tableGridMenu = this.tableGridRef.current;
+        const isClickInsideFormatMenu = formatMenu?.contains(e.target as Node);
+        const isClickInsideTableGrid = tableGridMenu?.contains(e.target as Node);
+        if (isTableGridOpen) {
+            if (!isClickInsideTableGrid && !isClickInsideFormatMenu) {
+                this.setState({
+                    isFormatMenuOpen: false,
+                    isTableGridOpen: false,
+                    tableGridPosition: null
+                });
+            }
+        }
+        else if (isFormatMenuOpen && !isTableGridOpen) {
+            if (!isClickInsideFormatMenu) {
+                this.setState({
+                    isFormatMenuOpen: false
+                });
+            }
+        }
+    };
+
+    private openTableGridSelect = (position: { x: number; y: number }): void => {
+        this.setState({
+            tableGridPosition: position,
+            isTableGridOpen: true,
+            tableHoveredRows: 0,
+            tableHoveredCols: 0,
+            isSelectingTable: true
+        });
+    };
+
+    private handleTableGridMouseMove = (e: React.MouseEvent): void => {
+        const { isSelectingTable, tableGridPosition } = this.state;
+        if (!isSelectingTable || !tableGridPosition) return;
+        const gridRect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - gridRect.left - this.TABLE_GRID_PADDING;
+        const y = e.clientY - gridRect.top - this.TABLE_GRID_PADDING;
+        const cols = Math.min(
+            Math.max(0, Math.floor(x / this.TABLE_CELL_SIZE)),
+            this.TABLE_MAX_COLS - 1
+        );
+        const rows = Math.min(
+            Math.max(0, Math.floor(y / this.TABLE_CELL_SIZE)),
+            this.TABLE_MAX_ROWS - 1
+        );
+        this.setState({
+            tableHoveredRows: rows + 1,
+            tableHoveredCols: cols + 1
+        });
+    };
+
+    private handleTableGridMouseClick = (): void => {
+        const { tableHoveredRows, tableHoveredCols } = this.state;
+        if (tableHoveredRows > 0 && tableHoveredCols > 0) {
+            this.insertTable(tableHoveredRows, tableHoveredCols);
+            this.setState({
+                isTableGridOpen: false,
+                isFormatMenuOpen: false,
+                tableGridPosition: null,
+                isSelectingTable: false
+            });
+        }
+    };
+
+    private renderTableGridSelect = (): React.ReactNode => {
+        const { theme, tableGridPosition, tableHoveredRows, tableHoveredCols, isSelectingTable } = this.state;
+        if (!tableGridPosition) return null;
+        const isDark = theme === 'dark';
+        const gridWidth = this.TABLE_MAX_COLS * this.TABLE_CELL_SIZE + this.TABLE_GRID_PADDING * 2;
+        const gridHeight = this.TABLE_MAX_ROWS * this.TABLE_CELL_SIZE + this.TABLE_GRID_PADDING * 2;
+        return (
+            <div
+                ref={this.tableGridRef}
+                className="table-grid-select-menu"
+                style={{
+                    position: 'fixed',
+                    left: `${tableGridPosition.x}px`,
+                    top: `${tableGridPosition.y}px`,
+                    width: `${gridWidth}px`,
+                    height: `${gridHeight}px`,
+                    backgroundColor: isDark ? '#2A2A2A' : '#FAFAFA',
+                    padding: `${this.TABLE_GRID_PADDING}px`,
+                    borderRadius: '4px',
+                    border: `1px solid ${isDark ? '#444444' : '#E1E1E1'}`,
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
+                    zIndex: 2002,
+                    cursor: 'default',
+                    pointerEvents: 'all'
+                }}
+                onMouseMove={this.handleTableGridMouseMove}
+                onClick={this.handleTableGridMouseClick}
+                onMouseLeave={() => {
+                    if (isSelectingTable) {
+                        this.setState({
+                            tableHoveredRows: 0,
+                            tableHoveredCols: 0
+                        });
+                    }
+                }}
+            >
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${this.TABLE_MAX_COLS}, ${this.TABLE_CELL_SIZE}px)`,
+                    gridTemplateRows: `repeat(${this.TABLE_MAX_ROWS}, ${this.TABLE_CELL_SIZE}px)`,
+                    gap: '1px'
+                }}>
+                    {Array.from({ length: this.TABLE_MAX_ROWS * this.TABLE_MAX_COLS }).map((_, index) => {
+                        const row = Math.floor(index / this.TABLE_MAX_COLS) + 1;
+                        const col = (index % this.TABLE_MAX_COLS) + 1;
+                        const isHovered = row <= tableHoveredRows && col <= tableHoveredCols;
+
+                        let backgroundColor = isDark ? '#3A3A3A' : '#F0F0F0';
+                        if (isHovered) {
+                            backgroundColor = isDark ? '#48AFF0' : '#137CBD';
+                        }
+
+                        return (
+                            <div
+                                key={index}
+                                style={{
+                                    width: `${this.TABLE_CELL_SIZE}px`,
+                                    height: `${this.TABLE_CELL_SIZE}px`,
+                                    border: `1px solid ${isDark ? '#555555' : '#CCCCCC'}`,
+                                    backgroundColor,
+                                    transition: 'background-color 0.1s ease'
+                                }}
+                                title={`${row}×${col}`}
+                            />
+                        );
+                    })}
+                </div>
+                <div style={{
+                    textAlign: 'center',
+                    fontSize: '12px',
+                    color: isDark ? '#CCCCCC' : '#333333',
+                    marginTop: '8px',
+                    height: '20px',
+                    lineHeight: '20px'
+                }}>
+                    {tableHoveredRows > 0 && tableHoveredCols > 0
+                        ? `${tableHoveredRows} × ${tableHoveredCols} 表格`
+                        : '拖动鼠标选择表格尺寸'
+                    }
+                </div>
+            </div>
+        );
+    };
 
     private handleThemeChange = (theme: 'dark' | 'light'): void => {
         this.setState({ theme });
@@ -427,8 +603,9 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     };
 
     private handleContentMouseMove = (e: React.MouseEvent<HTMLDivElement>): void => {
-        const { isDragging } = this.state;
+        const { isDragging, isFormatMenuOpen } = this.state;
         if (isDragging) return;
+        if (isFormatMenuOpen) return;
         const contentArea = e.currentTarget;
         const rect = contentArea.getBoundingClientRect();
         const y = e.clientY - rect.top;
@@ -439,9 +616,229 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     };
 
     private handleTextAreaMouseLeave = (): void => {
-        if (!this.state.isDragging) {
+        const { isDragging, isFormatMenuOpen } = this.state;
+        if (!isDragging && !isFormatMenuOpen) {
             this.setState({ hoveredLineNumber: null });
         }
+    };
+
+    private insertFormatting = (format: string): void => {
+        const { activeNoteId, notes, hoveredLineNumber, isFormatMenuOpen } = this.state;
+        if (!activeNoteId || !this.contentRef.current) return;
+        const textArea = this.contentRef.current;
+        const start = textArea.selectionStart;
+        const end = textArea.selectionEnd;
+        const value = textArea.value;
+        if (format === 'table') {
+            const formatMenu = document.querySelector('.popover-scroll') as HTMLElement;
+            if (!formatMenu) return;
+            const formatMenuRect = formatMenu.getBoundingClientRect();
+            const position = {
+                x: formatMenuRect.right + 10,
+                y: formatMenuRect.top
+            };
+            this.openTableGridSelect(position);
+            this.setState({ isFormatMenuOpen: true });
+            return;
+        }
+        let newValue = value;
+        let newCursorPos = start;
+        const currentLineStart = value.lastIndexOf('\n', start - 1) + 1;
+        const currentLineEnd = value.indexOf('\n', start);
+        const currentLine = value.substring(
+            currentLineStart,
+            currentLineEnd === -1 ? value.length : currentLineEnd
+        );
+        switch (format) {
+            case 'normal':
+                newValue = value.substring(0, start) + 'Text' + value.substring(end);
+                newCursorPos = start + 4;
+                break;
+            case 'h1':
+                newValue = value.substring(0, start) + '# Heading 1' + value.substring(end);
+                newCursorPos = start + 11;
+                break;
+            case 'h2':
+                newValue = value.substring(0, start) + '## Heading 2' + value.substring(end);
+                newCursorPos = start + 12;
+                break;
+            case 'h3':
+                newValue = value.substring(0, start) + '### Heading 3' + value.substring(end);
+                newCursorPos = start + 13;
+                break;
+            case 'ul':
+                newValue = value.substring(0, start) + '- List item' + value.substring(end);
+                newCursorPos = start + 11;
+                break;
+            case 'ol':
+                newValue = value.substring(0, start) + '1. List item' + value.substring(end);
+                newCursorPos = start + 12;
+                break;
+            case 'task':
+                newValue = value.substring(0, start) + '- [ ] Task item' + value.substring(end);
+                newCursorPos = start + 15;
+                break;
+            case 'quote':
+                newValue = value.substring(0, start) + '> Quote text' + value.substring(end);
+                newCursorPos = start + 12;
+                break;
+            case 'code':
+                newValue = value.substring(0, start) + '```\nCode block\n```' + value.substring(end);
+                newCursorPos = start + 5;
+                break;
+            case 'image':
+                newValue = value.substring(0, start) + '![Alt text](image-url)' + value.substring(end);
+                newCursorPos = start + 12;
+                break;
+            case 'link':
+                newValue = value.substring(0, start) + '[Link text](url)' + value.substring(end);
+                newCursorPos = start + 10;
+                break;
+            case 'table':
+                newValue = value.substring(0, start) + '\n| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |\n' + value.substring(end);
+                newCursorPos = start + 1;
+                break;
+        }
+        this.setState(prevState => ({
+            isFormatMenuOpen: false,
+            isTableGridOpen: false,
+            notes: prevState.notes.map(note =>
+                note.id === activeNoteId
+                    ? { ...note, content: newValue, updatedAt: new Date() }
+                    : note
+            )
+        }));
+        setTimeout(() => {
+            if (this.contentRef.current) {
+                this.contentRef.current.focus();
+                this.contentRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+        }, 10);
+        this.setState({ isFormatMenuOpen: false });
+    };
+
+    private insertTable = (rows: number, cols: number): void => {
+        const { activeNoteId, notes } = this.state;
+        if (!activeNoteId || !this.contentRef.current) return;
+        const textArea = this.contentRef.current;
+        const start = textArea.selectionStart;
+        const end = textArea.selectionEnd;
+        const value = textArea.value;
+        let table = '\n';
+        table += '|';
+        for (let i = 1; i <= cols; i++) {
+            table += ` Header ${i} |`;
+        }
+        table += '\n|';
+        for (let i = 1; i <= cols; i++) {
+            table += '----------|';
+        }
+        for (let r = 1; r <= rows; r++) {
+            table += '\n|';
+            for (let c = 1; c <= cols; c++) {
+                table += ` Cell ${(r - 1) * cols + c}   |`;
+            }
+        }
+        table += '\n';
+        const newValue = value.substring(0, start) + table + value.substring(end);
+        this.setState(prevState => ({
+            notes: prevState.notes.map(note =>
+                note.id === activeNoteId
+                    ? { ...note, content: newValue, updatedAt: new Date() }
+                    : note
+            ),
+            isTableGridOpen: false
+        }));
+        setTimeout(() => {
+            if (this.contentRef.current) {
+                this.contentRef.current.focus();
+                this.contentRef.current.setSelectionRange(start + 1, start + 1);
+            }
+        }, 10);
+    };
+
+    private renderFormatMenu = () => {
+        const { theme, hoveredLineNumber } = this.state;
+        const isDark = theme === 'dark';
+        const formatOptions = [
+            { icon: 'paragraph', label: '正文', value: 'normal' },
+            { icon: 'header-one', label: '一级标题', value: 'h1' },
+            { icon: 'header-two', label: '二级标题', value: 'h2' },
+            { icon: 'header-three', label: '三级标题', value: 'h3' },
+            { icon: 'list', label: '无序列表', value: 'ul' },
+            { icon: 'numbered-list', label: '有序列表', value: 'ol' },
+            { icon: 'tick', label: '任务列表', value: 'task' },
+            { icon: 'citation', label: '引用块', value: 'quote' },
+            { icon: 'code', label: '代码块', value: 'code' },
+            { icon: 'media', label: '图片', value: 'image' },
+            { icon: 'th', label: '表格', value: 'table' },
+            { icon: 'link', label: '链接', value: 'link' }
+        ];
+        return (
+            <div
+                style={{
+                    backgroundColor: isDark ? '#2A2A2A' : '#FAFAFA',
+                    padding: '4px',
+                    width: '180px',
+                    maxHeight: '270px',
+                    overflow: 'auto',
+                    borderRadius: '4px',
+                    border: `1px solid ${isDark ? '#444444' : '#E1E1E1'}`,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                    position: 'relative'
+                }}
+                className="popover-scroll"
+                onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                }}
+            >
+                <div style={{
+                    position: 'relative'
+                }}>
+                    {formatOptions.map((option) => (
+                        <div
+                            key={option.value}
+                            style={{
+                                padding: '6px 8px',
+                                margin: '1px 0',
+                                borderRadius: '3px',
+                                color: isDark ? '#CCCCCC' : '#333333',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                fontSize: '13px'
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                this.insertFormatting(option.value);
+                            }}
+                        >
+                            <Icon
+                                icon={option.icon as any}
+                                style={{
+                                    marginRight: '8px',
+                                    color: isDark ? '#8A8A8A' : '#666666'
+                                }}
+                                iconSize={14}
+                            />
+                            <span>{option.label}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
     };
 
     private renderFolderTree = (parentId: string | null = null, level: number = 0): React.ReactNode => {
@@ -647,10 +1044,11 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     };
 
     private renderLineNumbers = () => {
-        const { theme, hoveredLineNumber, isDragging, dragIndicatorPosition } = this.state;
+        const { theme, hoveredLineNumber, isDragging, dragIndicatorPosition, isFormatMenuOpen } = this.state;
         const isDark = theme === 'dark';
         const activeNote = this.getActiveNote();
         const lineCount = activeNote ? activeNote.content.split('\n').length + 1 : 1;
+        const popoverTop = hoveredLineNumber ? (hoveredLineNumber - 1) * this.LINE_HEIGHT + this.LINE_HEIGHT + 4 : 0;
         return (
             <div
                 style={{
@@ -691,31 +1089,39 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                         }}
                         onMouseDown={(e) => e.stopPropagation()}
                     >
-                        <Button
-                            icon="plus"
-                            minimal
-                            small
-                            style={{
-                                padding: '2px',
-                                minWidth: '20px',
-                                minHeight: '20px',
-                                border: 'none',
-                                outline: 'none',
-                                boxShadow: 'none',
-                                opacity: 0.7
-                            }}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                            }}
-                            onFocus={(e) => {
-                                e.stopPropagation();
-                                e.currentTarget.blur();
-                            }}
-                            onMouseDown={(e) => {
-                                e.stopPropagation();
-                                e.currentTarget.style.backgroundColor = 'transparent';
-                            }}
-                        />
+                        <div style={{ position: 'relative' }}>
+                            <Button
+                                icon="plus"
+                                minimal
+                                small
+                                style={{
+                                    padding: '2px',
+                                    minWidth: '20px',
+                                    minHeight: '20px',
+                                    border: 'none',
+                                    outline: 'none',
+                                    boxShadow: 'none',
+                                    opacity: 0.7
+                                }}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    this.setState(prevState => ({
+                                        isFormatMenuOpen: !prevState.isFormatMenuOpen
+                                    }));
+                                }}
+                                onFocus={(e) => {
+                                    e.stopPropagation();
+                                    e.currentTarget.blur();
+                                }}
+                                onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                }}
+                                title="Insert formatting"
+                            />
+                        </div>
                         <Button
                             icon="drag-handle-vertical"
                             minimal
@@ -743,12 +1149,33 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                         />
                     </div>
                 )}
+                {isFormatMenuOpen && hoveredLineNumber && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: `${popoverTop}px`,
+                            left: '60px',
+                            zIndex: 2000,
+                            pointerEvents: 'all'
+                        }}
+                        onMouseDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                        }}
+                    >
+                        {this.renderFormatMenu()}
+                    </div>
+                )}
             </div>
         );
     };
 
     render() {
-        const { theme, searchQuery, isDeleteDialogOpen, leftPanelWidth, isLeftPanelVisible, isResizing, isDragging, dragIndicatorPosition } = this.state;
+        const { theme, searchQuery, isDeleteDialogOpen, leftPanelWidth, isLeftPanelVisible, isResizing, isDragging, dragIndicatorPosition, isTableGridOpen } = this.state;
         const activeNote = this.getActiveNote();
         const isDark = theme === 'dark';
         return (
@@ -796,6 +1223,20 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                 .right-content-scroll::-webkit-scrollbar-thumb:hover {
                     background: ${isDark ? '#555555' : '#CCCCCC'};
                 }
+                .popover-scroll::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .popover-scroll::-webkit-scrollbar-track {
+                    background: ${isDark ? '#3A3A3A' : '#F0F0F0'};
+                    border-radius: 3px;
+                }
+                .popover-scroll::-webkit-scrollbar-thumb {
+                    background: ${isDark ? '#555555' : '#CCCCCC'};
+                    border-radius: 3px;
+                }
+                .popover-scroll::-webkit-scrollbar-thumb:hover {
+                    background: ${isDark ? '#666666' : '#BBBBBB'};
+                }
                 .left-panel-scroll {
                     scrollbar-width: thin;
                     scrollbar-color: ${isDark ? '#555555 #1A1A1A' : '#CCCCCC #F5F5F5'};
@@ -803,6 +1244,10 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                 .right-content-scroll {
                     scrollbar-width: thin;
                     scrollbar-color: ${isDark ? '#444444 #0A0A0A' : '#DDDDDD #F0F0F0'};
+                }
+                .popover-scroll {
+                    scrollbar-width: thin;
+                    scrollbar-color: ${isDark ? '#555555 #3A3A3A' : '#CCCCCC #F0F0F0'};
                 }
                 .custom-menu-item {
                     border-radius: 4px;
@@ -839,6 +1284,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                 }
                 `}
                 </style>
+                {isTableGridOpen && this.renderTableGridSelect()}
                 {isLeftPanelVisible && (
                     <>
                         <div

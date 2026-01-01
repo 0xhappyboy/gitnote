@@ -2,12 +2,13 @@ import React from 'react';
 import {
   Button,
   Menu,
-  MenuItem,
-  Switch
+  MenuItem
 } from '@blueprintjs/core';
 import { themeManager } from '../../globals/theme/ThemeManager';
 import { withRouter } from '../../WithRouter';
 import { handleCloseWindow, handleDragWindowMouseDown, handleMaximizeWindow, handleMinimizeWindow, handleRecoveryWindow } from '../../globals/commands/WindowsCommand';
+import { setupThemeChangeListener } from '../../globals/events/SystemEvents';
+import { getThemeSetting } from '../../globals/commands/SystemCommand';
 
 interface MenuItemData {
   key: string;
@@ -21,10 +22,12 @@ interface TopMenuBarState {
   isMaximized: boolean;
   activeMenu: string | null;
   menuPosition: { x: number; y: number } | null;
+  themeUnlisten: (() => void) | null;
 }
 
 interface TopMenuBarProps {
   navigate?: (path: string, options?: any) => void;
+  title?: string;
 }
 
 class TopMenuBar extends React.Component<TopMenuBarProps, TopMenuBarState> {
@@ -39,6 +42,7 @@ class TopMenuBar extends React.Component<TopMenuBarProps, TopMenuBarState> {
       isMaximized: false,
       activeMenu: null,
       menuPosition: null,
+      themeUnlisten: null,
     };
   }
 
@@ -81,19 +85,26 @@ class TopMenuBar extends React.Component<TopMenuBarProps, TopMenuBarState> {
   }
 
   toPage = (page: string) => {
-    this.props.navigate(page);
+    this.props.navigate?.(page);
   }
 
   handleResize = () => {
     this.setState({ windowWidth: window.innerWidth });
   };
 
+  handleThemeChange = (theme: 'dark' | 'light'): void => {
+    this.setState({ theme });
+  };
+
   componentDidMount() {
     window.addEventListener('resize', this.handleResize);
     document.addEventListener('click', this.handleDocumentClick);
-    this.unsubscribe = themeManager.subscribe((theme) => {
-      this.setState({ theme });
+    this.unsubscribe = themeManager.subscribe(this.handleThemeChange);
+    const themeUnlisten = setupThemeChangeListener((theme: string, isDark: any) => {
+      this.handleThemeChange(theme as 'dark' | 'light');
     });
+    this.setState({ themeUnlisten });
+    this.loadSavedTheme();
   }
 
   componentWillUnmount() {
@@ -102,7 +113,22 @@ class TopMenuBar extends React.Component<TopMenuBarProps, TopMenuBarState> {
     if (this.unsubscribe) {
       this.unsubscribe();
     }
+    if (this.state.themeUnlisten) {
+      this.state.themeUnlisten();
+    }
   }
+
+  private loadSavedTheme = async (): Promise<void> => {
+    try {
+      const savedTheme = await getThemeSetting();
+      if (savedTheme === 'dark' || savedTheme === 'light') {
+        this.handleThemeChange(savedTheme as 'dark' | 'light');
+      }
+    } catch (error) {
+      this.handleThemeChange(themeManager.getTheme());
+    }
+  };
+
 
   handleDocumentClick = (event: MouseEvent) => {
     const target = event.target as HTMLElement;
@@ -128,13 +154,8 @@ class TopMenuBar extends React.Component<TopMenuBarProps, TopMenuBarState> {
     }
   };
 
-  menuItems: MenuItemData[] = [];
-
-  toggleTheme = () => {
-    themeManager.toggleTheme();
-    setTimeout(() => {
-    }, 100);
-  };
+  menuItems: MenuItemData[] = [
+  ];
 
   handleMenuClick = (menuKey: string, event: React.MouseEvent) => {
     event.preventDefault();
@@ -246,7 +267,7 @@ class TopMenuBar extends React.Component<TopMenuBarProps, TopMenuBarState> {
 
   getVisibleMenuItems = () => {
     const { windowWidth } = this.state;
-    const rightControlsWidth = 220;
+    const rightControlsWidth = 90;
     const availableWidth = windowWidth - rightControlsWidth;
     const itemWidth = 45;
     const maxVisibleItems = Math.floor(availableWidth / itemWidth);
@@ -267,6 +288,7 @@ class TopMenuBar extends React.Component<TopMenuBarProps, TopMenuBarState> {
     const visibleMenuItems = this.getVisibleMenuItems();
     const showCenterTitle = this.shouldShowCenterTitle();
     const { title } = this.props;
+
     return (
       <>
         <div
@@ -369,41 +391,12 @@ class TopMenuBar extends React.Component<TopMenuBarProps, TopMenuBarState> {
             alignItems: 'center',
             height: '30px',
             paddingRight: '8px',
-            minWidth: '220px',
+            minWidth: '90px',
             backgroundColor: 'inherit',
             zIndex: 2,
-            position: 'relative'
+            position: 'relative',
+            justifyContent: 'flex-end'
           }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              marginRight: '12px',
-              fontSize: '12px',
-              height: '22px',
-              color: theme === 'dark' ? '#F5F8FA' : '#182026'
-            }}>
-              <Switch
-                checked={theme === 'light'}
-                onChange={this.toggleTheme}
-                style={{ margin: 0 }}
-                className="no-switch-focus"
-              />
-            </div>
-            <Button
-              minimal
-              icon="user"
-              text="Profile"
-              style={{
-                height: '30px',
-                minHeight: '30px',
-                padding: '0 8px',
-                margin: '0 4px',
-                fontSize: '12px',
-                color: theme === 'dark' ? '#F5F8FA' : '#182026',
-                border: 'none',
-                outline: 'none'
-              }}
-            />
             <Button
               minimal
               onClick={() => this.handleMinimizeWindowButtonClick()}

@@ -7,19 +7,13 @@ use tauri::{
 use crate::{
     context::AppState,
     events::system_event::emit_theme_changed,
-    global::{WINDOW_SIZE_MANAGE, WINDOW_SIZE_MANAGE_KEY},
+    global::{APP_CONFIG_MANAGER, WINDOW_SIZE_MANAGE, WINDOW_SIZE_MANAGE_KEY},
 };
-
-use crate::config::ConfigManager;
-
-lazy_static::lazy_static! {
-    static ref CONFIG_MANAGER: Mutex<ConfigManager> = Mutex::new(ConfigManager::new());
-}
 
 #[tauri::command]
 pub async fn save_theme_setting(app: AppHandle, theme: String) -> Result<(), String> {
     {
-        let mut config_manager = CONFIG_MANAGER.lock().unwrap();
+        let mut config_manager = APP_CONFIG_MANAGER.lock().unwrap();
         config_manager
             .update_theme(theme.clone())
             .map_err(|e| format!("Failed to save theme: {}", e))?;
@@ -31,14 +25,14 @@ pub async fn save_theme_setting(app: AppHandle, theme: String) -> Result<(), Str
 
 #[tauri::command]
 pub async fn get_theme_setting() -> Result<String, String> {
-    let config_manager = CONFIG_MANAGER.lock().unwrap();
+    let config_manager = APP_CONFIG_MANAGER.lock().unwrap();
     let config = config_manager.get_config();
     Ok(config.theme)
 }
 
 #[tauri::command]
 pub async fn save_preference_setting(auto_start: bool, auto_update: bool) -> Result<(), String> {
-    let mut config_manager = CONFIG_MANAGER.lock().unwrap();
+    let mut config_manager = APP_CONFIG_MANAGER.lock().unwrap();
     config_manager
         .update_auto_start(auto_start)
         .map_err(|e| format!("Failed to save auto_start: {}", e))?;
@@ -54,7 +48,7 @@ pub async fn save_git_setting(
     git_username: String,
     git_email: String,
 ) -> Result<(), String> {
-    let mut config_manager = CONFIG_MANAGER.lock().unwrap();
+    let mut config_manager = APP_CONFIG_MANAGER.lock().unwrap();
     config_manager
         .update_git_config(git_auto_commit, git_username, git_email)
         .map_err(|e| format!("Failed to save git config: {}", e))?;
@@ -69,7 +63,7 @@ pub async fn save_path_setting(
     auto_backup: bool,
 ) -> Result<(), String> {
     let note_storage_path_clone = note_storage_path.clone();
-    let mut config_manager = CONFIG_MANAGER.lock().unwrap();
+    let mut config_manager = APP_CONFIG_MANAGER.lock().unwrap();
     config_manager
         .update_path_config(note_storage_path, backup_path)
         .map_err(|e| format!("Failed to save path config: {}", e))?;

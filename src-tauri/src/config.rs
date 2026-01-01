@@ -45,12 +45,17 @@ impl AppConfig {
             let config: AppConfig = serde_json::from_str(&content)?;
             Ok(config)
         } else {
-            Ok(Self::default())
+            let config = Self::default();
+            config.save()?;
+            Ok(config)
         }
     }
 
     pub fn save(&self) -> std::io::Result<()> {
         let config_path = Self::config_path();
+        if let Some(parent) = config_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
         let content = serde_json::to_string_pretty(self)?;
         fs::write(config_path, content)?;
         Ok(())
@@ -59,9 +64,6 @@ impl AppConfig {
     fn config_path() -> PathBuf {
         let mut path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
         path.push(CONFIG_STORAGE_DIRECTORY_NAME);
-        if !path.exists() {
-            fs::create_dir_all(&path).unwrap_or_default();
-        }
         path.push("config.json");
         path
     }
@@ -73,7 +75,7 @@ pub struct ConfigManager {
 
 impl ConfigManager {
     pub fn new() -> Self {
-        let config = AppConfig::load().unwrap_or_default();
+        let config: AppConfig = AppConfig::load().unwrap_or_default();
         Self { config }
     }
 

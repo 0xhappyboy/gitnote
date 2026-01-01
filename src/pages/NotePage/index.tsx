@@ -14,6 +14,7 @@ import { TextFormatUtils } from './TextFormatUtils';
 import TextToolbar from './TextToolbar';
 import { setupThemeChangeListener } from '../../globals/events/SystemEvents';
 import { FileInfo, getDirectoryTree } from '../../globals/commands/FileCommand';
+import { getThemeSetting } from '../../globals/commands/SystemCommand';
 
 interface NotePageIndexProps {
     children?: React.ReactNode;
@@ -242,6 +243,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             this.handleThemeChange(theme as 'dark' | 'light');
         });
         this.loadFileTree();
+        this.loadSavedTheme();
     }
 
     componentWillUnmount() {
@@ -258,6 +260,17 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             this.themeUnlisten();
         }
     }
+
+    private loadSavedTheme = async (): Promise<void> => {
+        try {
+            const savedTheme = await getThemeSetting();
+            if (savedTheme === 'dark' || savedTheme === 'light') {
+                this.handleThemeChange(savedTheme as 'dark' | 'light');
+            }
+        } catch (error) {
+            this.handleThemeChange(themeManager.getTheme());
+        }
+    };
 
     private loadFileTree = async (): Promise<void> => {
         this.setState({ isLoadingFiles: true, fileTreeError: null });
@@ -2051,7 +2064,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                         overflow: 'visible'
                                     }}
                                 >
-                                    {/* 显示文件树 */}
                                     {fileTree.length > 0 && (
                                         <div style={{ padding: '4px 0' }}>
                                             <div style={{
@@ -2076,10 +2088,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                             )}
                                         </div>
                                     )}
-
-                                    {/* 原有的文件夹树 */}
                                     {this.renderFolderTree()}
-
                                     {this.getFilteredNotes() && (
                                         <div style={{ padding: '4px 0' }}>
                                             <div style={{
@@ -2099,7 +2108,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                 </Menu>
                             </div>
                         </div>
-
                         <div
                             style={{
                                 width: '6px',

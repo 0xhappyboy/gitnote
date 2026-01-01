@@ -4,7 +4,7 @@ import { themeManager } from './globals/theme/ThemeManager';
 import TopArea from './components/top/TopArea';
 import MiddleArea from './components/center/MiddleArea';
 import { BrowserRouter } from 'react-router-dom';
-import NotePageIndex from './pages/NotePageIndex';
+import NotePageIndex from './pages/NotePage';
 
 import FavoritesPage from './pages/FavoritesPage';
 import TagsPage from './pages/TagsPage';

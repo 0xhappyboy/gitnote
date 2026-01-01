@@ -11,7 +11,9 @@ import {
     Popover,
     Position
 } from '@blueprintjs/core';
-import { themeManager } from '../globals/theme/ThemeManager';
+import { themeManager } from '../../globals/theme/ThemeManager';
+import { TextFormatUtils } from './TextFormatUtils';
+import TextToolbar from './TextToolbar';
 
 interface NotePageIndexProps {
     children?: React.ReactNode;
@@ -56,6 +58,25 @@ interface NotePageIndexState {
     tableSelectedRows: number;
     tableSelectedCols: number;
     isSelectingTable: boolean;
+
+    isTextToolbarOpen: boolean;
+    textToolbarPosition: { x: number; y: number } | null;
+    editorRect: DOMRect | null;
+    selectedTextRange: { start: number; end: number } | null;
+    selectedText: string;
+    textToolbarType: string;
+    textToolbarBold: boolean;
+    textToolbarItalic: boolean;
+    textToolbarUnderline: boolean;
+    textToolbarStrikethrough: boolean;
+    textToolbarFontColor: string;
+    textToolbarBgColor: string;
+    textToolbarFontFamily: string;
+    textToolbarFontSize: string;
+    textToolbarAlignment: string;
+    isLinkDialogOpen: boolean;
+    linkUrl: string;
+    linkText: string;
 }
 
 class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexState> {
@@ -174,7 +195,25 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             tableHoveredCols: 0,
             tableSelectedRows: 0,
             tableSelectedCols: 0,
-            isSelectingTable: false
+            isSelectingTable: false,
+            isTextToolbarOpen: false,
+            textToolbarPosition: null,
+            editorRect: null,
+            selectedTextRange: null,
+            selectedText: '',
+            textToolbarType: 'normal',
+            textToolbarBold: false,
+            textToolbarItalic: false,
+            textToolbarUnderline: false,
+            textToolbarStrikethrough: false,
+            textToolbarFontColor: '#000000',
+            textToolbarBgColor: 'transparent',
+            textToolbarFontFamily: 'default',
+            textToolbarFontSize: '14px',
+            textToolbarAlignment: 'left',
+            isLinkDialogOpen: false,
+            linkUrl: '',
+            linkText: ''
         };
     }
 
@@ -183,7 +222,9 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         this.setupAutoSave();
         this.setupResizeListeners();
         this.setupDragListeners();
+        this.setupTextSelectionListener();
         document.addEventListener('click', this.handleGlobalClick);
+        document.addEventListener('scroll', this.handleScroll);
     }
 
     componentWillUnmount() {
@@ -193,15 +234,335 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         this.cleanupAutoSave();
         this.cleanupResizeListeners();
         this.cleanupDragListeners();
+        this.cleanupTextSelectionListener();
         document.removeEventListener('click', this.handleGlobalClick);
+        document.removeEventListener('scroll', this.handleScroll);
     }
 
+    private handleScroll = (): void => {
+        const { isTextToolbarOpen } = this.state;
+        if (isTextToolbarOpen) {
+            this.setState({
+                isTextToolbarOpen: false,
+                textToolbarPosition: null
+            });
+        }
+    };
+
+    private handleTextTypeChange = (type: string): void => {
+        this.setState({ textToolbarType: type });
+    };
+
+    private handleBoldToggle = (): void => {
+        this.setState(prevState => ({ textToolbarBold: !prevState.textToolbarBold }));
+    };
+
+    private handleItalicToggle = (): void => {
+        this.setState(prevState => ({ textToolbarItalic: !prevState.textToolbarItalic }));
+    };
+
+    private handleUnderlineToggle = (): void => {
+        this.setState(prevState => ({ textToolbarUnderline: !prevState.textToolbarUnderline }));
+    };
+
+    private handleStrikethroughToggle = (): void => {
+        this.setState(prevState => ({ textToolbarStrikethrough: !prevState.textToolbarStrikethrough }));
+    };
+
+    private handleFontColorChange = (color: string): void => {
+        this.setState({ textToolbarFontColor: color });
+    };
+
+    private handleBgColorChange = (color: string): void => {
+        this.setState({ textToolbarBgColor: color });
+    };
+
+    private handleFontFamilyChange = (fontFamily: string): void => {
+        this.setState({ textToolbarFontFamily: fontFamily });
+    };
+
+    private handleFontSizeChange = (fontSize: string): void => {
+        this.setState({ textToolbarFontSize: fontSize });
+    };
+
+    private handleAlignmentChange = (alignment: string): void => {
+        this.setState({ textToolbarAlignment: alignment });
+    };
+
+    private handleLinkDialogOpen = (): void => {
+        this.setState({ isLinkDialogOpen: true });
+    };
+
+    private handleLinkDialogClose = (): void => {
+        this.setState({ isLinkDialogOpen: false });
+    };
+
+    private handleLinkUrlChange = (url: string): void => {
+        this.setState({ linkUrl: url });
+    };
+
+    private handleLinkApply = (): void => {
+        const { activeNoteId, notes, selectedTextRange, linkUrl, selectedText } = this.state;
+        if (!activeNoteId || !selectedTextRange || !linkUrl.trim()) return;
+        const activeNoteIndex = notes.findIndex(note => note.id === activeNoteId);
+        if (activeNoteIndex === -1) return;
+        const activeNote = notes[activeNoteIndex];
+        const formattedContent = TextFormatUtils.applyLink(
+            activeNote.content,
+            selectedTextRange.start,
+            selectedTextRange.end,
+            linkUrl
+        );
+        this.setState(prevState => ({
+            notes: prevState.notes.map((note, index) =>
+                index === activeNoteIndex
+                    ? {
+                        ...note,
+                        content: formattedContent,
+                        updatedAt: new Date()
+                    }
+                    : note
+            ),
+            isLinkDialogOpen: false,
+            linkUrl: '',
+            isTextToolbarOpen: false,
+            textToolbarPosition: null
+        }));
+        setTimeout(() => {
+            if (this.contentRef.current) {
+                const newCursorPos = selectedTextRange.start + selectedText.length + linkUrl.length + 4;
+                this.contentRef.current.focus();
+                this.contentRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+        }, 10);
+    };
+
+    private handleFormatApply = (): void => {
+        const {
+            activeNoteId,
+            notes,
+            selectedTextRange,
+            textToolbarType,
+            textToolbarBold,
+            textToolbarItalic,
+            textToolbarUnderline,
+            textToolbarStrikethrough,
+            textToolbarFontColor,
+            textToolbarBgColor,
+            textToolbarFontFamily,
+            textToolbarFontSize,
+            textToolbarAlignment,
+            selectedText
+        } = this.state;
+        if (!activeNoteId || !selectedTextRange) return;
+        const activeNoteIndex = notes.findIndex(note => note.id === activeNoteId);
+        if (activeNoteIndex === -1) return;
+        const activeNote = notes[activeNoteIndex];
+        const formattedContent = TextFormatUtils.applyTextFormat(
+            activeNote.content,
+            selectedTextRange.start,
+            selectedTextRange.end,
+            {
+                type: textToolbarType,
+                bold: textToolbarBold,
+                italic: textToolbarItalic,
+                underline: textToolbarUnderline,
+                strikethrough: textToolbarStrikethrough,
+                fontColor: textToolbarFontColor,
+                bgColor: textToolbarBgColor,
+                fontFamily: textToolbarFontFamily,
+                fontSize: textToolbarFontSize,
+                alignment: textToolbarAlignment
+            }
+        );
+        this.setState(prevState => ({
+            notes: prevState.notes.map((note, index) =>
+                index === activeNoteIndex
+                    ? {
+                        ...note,
+                        content: formattedContent,
+                        updatedAt: new Date()
+                    }
+                    : note
+            ),
+            isTextToolbarOpen: false,
+            textToolbarPosition: null
+        }));
+        setTimeout(() => {
+            if (this.contentRef.current) {
+                let newLength = selectedText.length;
+                if (textToolbarType === 'h1') newLength += 2;
+                else if (textToolbarType === 'h2') newLength += 3;
+                else if (textToolbarType === 'h3') newLength += 4;
+                else if (textToolbarType === 'ul' || textToolbarType === 'ol' || textToolbarType === 'blockquote') newLength += 2;
+                else if (textToolbarType === 'inline-code') newLength += 2;
+                if (textToolbarBold) newLength += 4;
+                if (textToolbarItalic) newLength += 2;
+                if (textToolbarStrikethrough) newLength += 4;
+                if (textToolbarUnderline) newLength += 7;
+                const newCursorPos = selectedTextRange.start + newLength;
+                this.contentRef.current.focus();
+                this.contentRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+        }, 10);
+    };
+
+    private setupTextSelectionListener = (): void => {
+        if (this.contentRef.current) {
+            this.contentRef.current.addEventListener('mouseup', this.handleTextSelection);
+            this.contentRef.current.addEventListener('select', this.handleTextSelection);
+            this.contentRef.current.addEventListener('keyup', this.handleTextSelection);
+        }
+    };
+
+    private cleanupTextSelectionListener = (): void => {
+        if (this.contentRef.current) {
+            this.contentRef.current.removeEventListener('mouseup', this.handleTextSelection);
+            this.contentRef.current.removeEventListener('select', this.handleTextSelection);
+            this.contentRef.current.removeEventListener('keyup', this.handleTextSelection);
+        }
+    };
+
+    private handleTextSelection = (): void => {
+        if (!this.contentRef.current) return;
+        const textArea = this.contentRef.current;
+        const start = textArea.selectionStart;
+        const end = textArea.selectionEnd;
+        if (start !== end) {
+            const selectedText = textArea.value.substring(start, end);
+            const format = TextFormatUtils.detectFormatAtPosition(textArea.value, start);
+            const editorRect = textArea.getBoundingClientRect();
+            let x = editorRect.left + editorRect.width / 2;
+            let y = editorRect.top + editorRect.height / 2;
+            try {
+                const tempDiv = document.createElement('div');
+                tempDiv.style.position = 'fixed';
+                tempDiv.style.left = '-1000px';
+                tempDiv.style.top = '-1000px';
+                tempDiv.style.whiteSpace = 'pre-wrap';
+                tempDiv.style.fontSize = window.getComputedStyle(textArea).fontSize;
+                tempDiv.style.fontFamily = window.getComputedStyle(textArea).fontFamily;
+                tempDiv.style.lineHeight = window.getComputedStyle(textArea).lineHeight;
+                tempDiv.style.width = editorRect.width + 'px';
+                const lines = textArea.value.split('\n');
+                const startLine = textArea.value.substring(0, start).split('\n').length - 1;
+                const endLine = textArea.value.substring(0, end).split('\n').length - 1;
+                let htmlContent = '';
+                for (let i = 0; i < lines.length; i++) {
+                    if (i === startLine && i === endLine) {
+                        const line = lines[i];
+                        const lineStart = textArea.value.substring(0, start).split('\n').pop()?.length || 0;
+                        const lineEnd = lineStart + (end - start);
+                        htmlContent += line.substring(0, lineStart) +
+                            '<span id="selected-text">' +
+                            line.substring(lineStart, lineEnd) +
+                            '</span>' +
+                            line.substring(lineEnd);
+                    } else if (i === startLine) {
+                        const line = lines[i];
+                        const lineStart = textArea.value.substring(0, start).split('\n').pop()?.length || 0;
+                        htmlContent += line.substring(0, lineStart) +
+                            '<span id="selected-text">' +
+                            line.substring(lineStart) +
+                            '</span>';
+                    } else if (i > startLine && i < endLine) {
+                        htmlContent += '<span id="selected-text">' + lines[i] + '</span>';
+                    } else if (i === endLine) {
+                        const line = lines[i];
+                        const lineEnd = textArea.value.substring(0, end).split('\n').pop()?.length || 0;
+                        htmlContent += '<span id="selected-text">' +
+                            line.substring(0, lineEnd) +
+                            '</span>' +
+                            line.substring(lineEnd);
+                    } else {
+                        htmlContent += lines[i];
+                    }
+                    if (i < lines.length - 1) {
+                        htmlContent += '<br>';
+                    }
+                }
+                tempDiv.innerHTML = htmlContent;
+                document.body.appendChild(tempDiv);
+                const selectedElement = tempDiv.querySelector('#selected-text');
+                if (selectedElement) {
+                    const selectedRect = selectedElement.getBoundingClientRect();
+                    x = selectedRect.left + selectedRect.width / 2;
+                    y = selectedRect.bottom;
+                }
+                document.body.removeChild(tempDiv);
+
+            } catch (error) {
+                console.error('获取选中文本位置失败:', error);
+                const lines = textArea.value.substring(0, start).split('\n');
+                const lineNumber = lines.length;
+                const lineHeight = this.LINE_HEIGHT;
+                const relativeY = (lineNumber * lineHeight) + textArea.scrollTop;
+                const relativeX = editorRect.width / 2;
+                x = editorRect.left + relativeX;
+                y = editorRect.top + relativeY + lineHeight;
+            }
+            const toolbarWidth = 390;
+            const toolbarHeight = 40;
+            if (x - toolbarWidth / 2 < editorRect.left + 10) {
+                x = editorRect.left + 10 + toolbarWidth / 2;
+            } else if (x + toolbarWidth / 2 > editorRect.right - 10) {
+                x = editorRect.right - 10 - toolbarWidth / 2;
+            }
+            if (y + toolbarHeight + 10 > editorRect.bottom) {
+                y = editorRect.bottom - toolbarHeight - 10;
+            } else if (y < editorRect.top + 10) {
+                y = editorRect.top + 10;
+            } else {
+                y = y + 10;
+            }
+            this.setState({
+                isTextToolbarOpen: true,
+                textToolbarPosition: { x, y },
+                editorRect,
+                selectedTextRange: { start, end },
+                selectedText,
+                textToolbarType: format.type,
+                textToolbarBold: format.bold,
+                textToolbarItalic: format.italic,
+                textToolbarUnderline: format.underline,
+                textToolbarStrikethrough: format.strikethrough,
+                textToolbarFontColor: '#000000',
+                textToolbarBgColor: 'transparent',
+                textToolbarFontFamily: 'default',
+                textToolbarFontSize: '14px',
+                textToolbarAlignment: 'left',
+                isLinkDialogOpen: false,
+                linkUrl: '',
+                linkText: selectedText
+            });
+        } else {
+            this.setState({
+                isTextToolbarOpen: false,
+                textToolbarPosition: null,
+                editorRect: null,
+                selectedTextRange: null
+            });
+        }
+    };
+
     private handleGlobalClick = (e: MouseEvent): void => {
-        const { isFormatMenuOpen, isTableGridOpen } = this.state;
+        const {
+            isFormatMenuOpen,
+            isTableGridOpen,
+            isTextToolbarOpen
+        } = this.state;
         const formatMenu = document.querySelector('.popover-scroll');
         const tableGridMenu = this.tableGridRef.current;
+        const textToolbar = document.querySelector('.text-toolbar-container');
         const isClickInsideFormatMenu = formatMenu?.contains(e.target as Node);
         const isClickInsideTableGrid = tableGridMenu?.contains(e.target as Node);
+        const isClickInsideTextToolbar = textToolbar?.contains(e.target as Node);
+        if (isTextToolbarOpen && !isClickInsideTextToolbar) {
+            this.setState({
+                isTextToolbarOpen: false,
+                textToolbarPosition: null
+            });
+        }
         if (isTableGridOpen) {
             if (!isClickInsideTableGrid && !isClickInsideFormatMenu) {
                 this.setState({
@@ -267,8 +628,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         const { theme, tableGridPosition, tableHoveredRows, tableHoveredCols, isSelectingTable } = this.state;
         if (!tableGridPosition) return null;
         const isDark = theme === 'dark';
-        const gridWidth = this.TABLE_MAX_COLS * this.TABLE_CELL_SIZE + this.TABLE_GRID_PADDING * 2;
-        const gridHeight = this.TABLE_MAX_ROWS * this.TABLE_CELL_SIZE + this.TABLE_GRID_PADDING * 2;
         return (
             <div
                 ref={this.tableGridRef}
@@ -277,8 +636,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                     position: 'fixed',
                     left: `${tableGridPosition.x}px`,
                     top: `${tableGridPosition.y}px`,
-                    width: `${gridWidth}px`,
-                    height: `${gridHeight}px`,
                     backgroundColor: isDark ? '#2A2A2A' : '#FAFAFA',
                     padding: `${this.TABLE_GRID_PADDING}px`,
                     borderRadius: '4px',
@@ -629,6 +986,16 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         const start = textArea.selectionStart;
         const end = textArea.selectionEnd;
         const value = textArea.value;
+        const lines = value.split('\n');
+        let currentLineIndex = 0;
+        let charCount = 0;
+        for (let i = 0; i < lines.length; i++) {
+            charCount += lines[i].length + 1;
+            if (charCount > start) {
+                currentLineIndex = i;
+                break;
+            }
+        }
         if (format === 'table') {
             const formatMenu = document.querySelector('.popover-scroll') as HTMLElement;
             if (!formatMenu) return;
@@ -649,54 +1016,63 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             currentLineStart,
             currentLineEnd === -1 ? value.length : currentLineEnd
         );
+        let insertPosition = currentLineEnd === -1 ? value.length : currentLineEnd;
+        if (currentLineEnd === -1) {
+            newValue = value + '\n';
+            insertPosition = newValue.length - 1;
+        }
         switch (format) {
             case 'normal':
-                newValue = value.substring(0, start) + 'Text' + value.substring(end);
-                newCursorPos = start + 4;
+                newValue = value.substring(0, insertPosition) + '\nText' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'h1':
-                newValue = value.substring(0, start) + '# Heading 1' + value.substring(end);
-                newCursorPos = start + 11;
+                newValue = value.substring(0, insertPosition) + '\n# Heading 1' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'h2':
-                newValue = value.substring(0, start) + '## Heading 2' + value.substring(end);
-                newCursorPos = start + 12;
+                newValue = value.substring(0, insertPosition) + '\n## Heading 2' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'h3':
-                newValue = value.substring(0, start) + '### Heading 3' + value.substring(end);
-                newCursorPos = start + 13;
+                newValue = value.substring(0, insertPosition) + '\n### Heading 3' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'ul':
-                newValue = value.substring(0, start) + '- List item' + value.substring(end);
-                newCursorPos = start + 11;
+                newValue = value.substring(0, insertPosition) + '\n- List item' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'ol':
-                newValue = value.substring(0, start) + '1. List item' + value.substring(end);
-                newCursorPos = start + 12;
+                newValue = value.substring(0, insertPosition) + '\n1. List item' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'task':
-                newValue = value.substring(0, start) + '- [ ] Task item' + value.substring(end);
-                newCursorPos = start + 15;
+                newValue = value.substring(0, insertPosition) + '\n- [ ] Task item' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'quote':
-                newValue = value.substring(0, start) + '> Quote text' + value.substring(end);
-                newCursorPos = start + 12;
+                newValue = value.substring(0, insertPosition) + '\n> Quote text' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'code':
-                newValue = value.substring(0, start) + '```\nCode block\n```' + value.substring(end);
-                newCursorPos = start + 5;
+                newValue = value.substring(0, insertPosition) + '\n```\nCode block\n```' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'image':
-                newValue = value.substring(0, start) + '![Alt text](image-url)' + value.substring(end);
-                newCursorPos = start + 12;
+                newValue = value.substring(0, insertPosition) + '\n![Alt text](image-url)' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'link':
-                newValue = value.substring(0, start) + '[Link text](url)' + value.substring(end);
-                newCursorPos = start + 10;
+                newValue = value.substring(0, insertPosition) + '\n[Link text](url)' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
+                break;
+            case 'attachment':
+                newValue = value.substring(0, insertPosition) + '\n[Attachment](file:///path/to/file)' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
             case 'table':
-                newValue = value.substring(0, start) + '\n| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |\n' + value.substring(end);
-                newCursorPos = start + 1;
+                newValue = value.substring(0, insertPosition) + '\n| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |\n' + value.substring(insertPosition);
+                newCursorPos = insertPosition + 1;
                 break;
         }
         this.setState(prevState => ({
@@ -711,7 +1087,15 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         setTimeout(() => {
             if (this.contentRef.current) {
                 this.contentRef.current.focus();
-                this.contentRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                if (format === 'normal') {
+                    this.contentRef.current.setSelectionRange(newCursorPos + 4, newCursorPos + 4);
+                } else if (format === 'h1') {
+                    this.contentRef.current.setSelectionRange(newCursorPos + 11, newCursorPos + 11);
+                } else if (format === 'attachment') {
+                    this.contentRef.current.setSelectionRange(newCursorPos + 1, newCursorPos + 11);
+                } else {
+                    this.contentRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                }
             }
         }, 10);
         this.setState({ isFormatMenuOpen: false });
@@ -772,7 +1156,8 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             { icon: 'code', label: '代码块', value: 'code' },
             { icon: 'media', label: '图片', value: 'image' },
             { icon: 'th', label: '表格', value: 'table' },
-            { icon: 'link', label: '链接', value: 'link' }
+            { icon: 'link', label: '链接', value: 'link' },
+            { icon: 'paperclip', label: '附件', value: 'attachment' }
         ];
         return (
             <div
@@ -1106,6 +1491,18 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     e.preventDefault();
+                                    if (this.contentRef.current && hoveredLineNumber) {
+                                        const textArea = this.contentRef.current;
+                                        const value = textArea.value;
+                                        const lines = value.split('\n');
+                                        let lineStartIndex = 0;
+                                        for (let i = 0; i < hoveredLineNumber - 1; i++) {
+                                            lineStartIndex += lines[i].length + 1;
+                                        }
+                                        const lineEndIndex = lineStartIndex + lines[hoveredLineNumber - 1]?.length || 0;
+                                        textArea.focus();
+                                        textArea.setSelectionRange(lineEndIndex, lineEndIndex);
+                                    }
                                     this.setState(prevState => ({
                                         isFormatMenuOpen: !prevState.isFormatMenuOpen
                                     }));
@@ -1175,9 +1572,37 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     };
 
     render() {
-        const { theme, searchQuery, isDeleteDialogOpen, leftPanelWidth, isLeftPanelVisible, isResizing, isDragging, dragIndicatorPosition, isTableGridOpen } = this.state;
+        const {
+            theme,
+            searchQuery,
+            isDeleteDialogOpen,
+            leftPanelWidth,
+            isLeftPanelVisible,
+            isResizing,
+            isDragging,
+            dragIndicatorPosition,
+            isTableGridOpen,
+            isTextToolbarOpen,
+            textToolbarPosition,
+            textToolbarType,
+            textToolbarBold,
+            textToolbarItalic,
+            textToolbarUnderline,
+            textToolbarStrikethrough,
+            textToolbarFontColor,
+            textToolbarBgColor,
+            textToolbarFontFamily,
+            textToolbarFontSize,
+            textToolbarAlignment,
+            isLinkDialogOpen,
+            linkUrl,
+            linkText,
+            selectedText
+        } = this.state;
+
         const activeNote = this.getActiveNote();
         const isDark = theme === 'dark';
+
         return (
             <div
                 ref={this.containerRef}
@@ -1237,6 +1662,9 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                 .popover-scroll::-webkit-scrollbar-thumb:hover {
                     background: ${isDark ? '#666666' : '#BBBBBB'};
                 }
+                .text-toolbar-container {
+                    z-index: 3000;
+                }
                 .left-panel-scroll {
                     scrollbar-width: thin;
                     scrollbar-color: ${isDark ? '#555555 #1A1A1A' : '#CCCCCC #F5F5F5'};
@@ -1284,7 +1712,49 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                 }
                 `}
                 </style>
+
+                {isTextToolbarOpen && textToolbarPosition && (
+                    <div className="text-toolbar-container">
+                        <TextToolbar
+                            theme={theme}
+                            position={textToolbarPosition}
+                            editorRect={this.state.editorRect}
+                            selectedText={selectedText}
+                            textType={textToolbarType}
+                            bold={textToolbarBold}
+                            italic={textToolbarItalic}
+                            underline={textToolbarUnderline}
+                            strikethrough={textToolbarStrikethrough}
+                            fontColor={textToolbarFontColor}
+                            bgColor={textToolbarBgColor}
+                            fontFamily={textToolbarFontFamily}
+                            fontSize={textToolbarFontSize}
+                            alignment={textToolbarAlignment}
+                            isLinkDialogOpen={isLinkDialogOpen}
+                            linkUrl={linkUrl}
+                            linkText={linkText}
+
+                            onTextTypeChange={this.handleTextTypeChange}
+                            onBoldToggle={this.handleBoldToggle}
+                            onItalicToggle={this.handleItalicToggle}
+                            onUnderlineToggle={this.handleUnderlineToggle}
+                            onStrikethroughToggle={this.handleStrikethroughToggle}
+                            onFontColorChange={this.handleFontColorChange}
+                            onBgColorChange={this.handleBgColorChange}
+                            onFontFamilyChange={this.handleFontFamilyChange}
+                            onFontSizeChange={this.handleFontSizeChange}
+                            onAlignmentChange={this.handleAlignmentChange}
+                            onLinkDialogOpen={this.handleLinkDialogOpen}
+                            onLinkDialogClose={this.handleLinkDialogClose}
+                            onLinkUrlChange={this.handleLinkUrlChange}
+                            onLinkApply={this.handleLinkApply}
+                            onFormatApply={this.handleFormatApply}
+                        />
+                    </div>
+                )}
+
                 {isTableGridOpen && this.renderTableGridSelect()}
+
                 {isLeftPanelVisible && (
                     <>
                         <div
@@ -1369,6 +1839,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                 </Menu>
                             </div>
                         </div>
+
                         <div
                             style={{
                                 width: '6px',
@@ -1551,7 +2022,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                             style={{
                                 flex: 1,
                                 padding: '0',
-                                overflow: 'auto',
                                 backgroundColor: isDark ? '#000000' : '#FFFFFF',
                                 position: 'relative'
                             }}

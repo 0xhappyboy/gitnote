@@ -1,3 +1,5 @@
+use crate::commands::system_command::*;
+use crate::events::system_event::setup_theme_events;
 use crate::{
     commands::windows_command::{
         close_window, drag_window, maximize_window, minimize_window, open_system_setting_window,
@@ -5,10 +7,11 @@ use crate::{
     },
     context::AppState,
 };
-
 pub mod commands;
+pub mod config;
 pub mod context;
 pub mod global;
+pub mod events;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,9 +23,15 @@ pub fn run() {
             recovery_window,
             close_window,
             drag_window,
-            open_system_setting_window
+            open_system_setting_window,
+            save_path_setting,
+            save_git_setting,
+            save_preference_setting,
+            get_theme_setting,
+            save_theme_setting
         ])
         .setup(|app| {
+            setup_theme_events(&app.handle());
             if cfg!(debug_assertions) {
                 app.handle().plugin(
                     tauri_plugin_log::Builder::default()

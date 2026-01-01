@@ -26,6 +26,7 @@ import {
     Desktop,
 } from '@blueprintjs/icons';
 import { themeManager } from '../globals/theme/ThemeManager';
+import { getThemeSetting, saveGitSetting, savePathSetting, savePreferenceSetting, saveThemeSetting } from '../globals/commands/SystemCommand';
 
 interface SettingItem {
     key: string;
@@ -40,7 +41,7 @@ interface SystemSettingPageProps {
 const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDark }) => {
     const [isDark, setIsDark] = useState<boolean>(propIsDark || themeManager.getTheme() === 'dark');
     const [selectedMenu, setSelectedMenu] = useState<string>('基本设置');
-    const [theme, setTheme] = useState<string>(themeManager.getTheme() === 'dark' ? '深色模式' : '浅色模式');
+    const [theme, setTheme] = useState<string>(themeManager.getTheme() === 'dark' ? 'dark' : 'light');
     const [autoStart, setAutoStart] = useState<boolean>(true);
     const [autoUpdate, setAutoUpdate] = useState<boolean>(true);
     const [gitAutoCommit, setGitAutoCommit] = useState<boolean>(true);
@@ -51,21 +52,38 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
     const [backupPath, setBackupPath] = useState<string>('');
 
     useEffect(() => {
-        const handleThemeChange = (theme: 'dark' | 'light') => {
-            setIsDark(theme === 'dark');
-            setTheme(theme === 'dark' ? '深色模式' : '浅色模式');
+        const loadConfig = async () => {
+            try {
+                const savedTheme = await getThemeSetting();
+                if (savedTheme === 'dark') {
+                    setIsDark(true);
+                    setTheme('dark');
+                } else {
+                    setIsDark(false);
+                    setTheme('light');
+                }
+            } catch (error) {
+                console.error('Failed to load config:', error);
+            }
         };
-
-        const unsubscribe = themeManager.subscribe(handleThemeChange);
-        return () => unsubscribe();
+        loadConfig();
     }, []);
 
-    const handleThemeChange = (newTheme: string) => {
+    const handleThemeChange = async (newTheme: string) => {
         setTheme(newTheme);
-        if (newTheme === '浅色模式') {
+        if (newTheme === 'light') {
             themeManager.setTheme('light');
-        } else if (newTheme === '深色模式') {
+            setIsDark(false);
+        } else if (newTheme === 'dark') {
             themeManager.setTheme('dark');
+            setIsDark(true);
+        }
+        try {
+            const themeValue = newTheme === 'light' ? 'light' : 'dark';
+            await saveThemeSetting(themeValue);
+            console.log('主题已保存到配置文件:', themeValue);
+        } catch (error) {
+            console.error('保存主题设置失败:', error);
         }
     };
 
@@ -81,302 +99,308 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
 
     const renderContent = () => {
         switch (selectedMenu) {
-             case '基本设置':
-            return (
-                <>
-                    <div style={{ marginBottom: 24 }}>
-                        <H5 style={{ color: isDark ? '#E8E8E8' : '#1A1A1A', fontSize: '14px', marginBottom: 8 }}>
-                            主题设置
-                        </H5>
-                        <Divider style={{
-                            backgroundColor: isDark ? '#333333' : '#E1E1E1',
-                            margin: '8px 0'
-                        }} />
-                        <div style={{ marginTop: 16 }}>
-                            <RadioGroup
-                                label="选择主题"
-                                selectedValue={theme}
-                                onChange={(e) => handleThemeChange(e.currentTarget.value)}
-                                style={{ fontSize: '13px' }}
-                            >
-                                <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
-                                    <div
-                                        style={{
-                                            cursor: 'pointer',
-                                            border: `2px solid ${theme === '浅色模式' ? (isDark ? '#48AFF0' : '#137CBD') : 'transparent'}`,
-                                            borderRadius: '8px',
-                                            padding: '8px',
-                                            backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
-                                            width: '150px',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                        onClick={() => handleThemeChange('浅色模式')}
-                                    >
-                                        <div onClick={(e) => e.stopPropagation()}>
-                                            <Radio
-                                                label="浅色模式"
-                                                value="浅色模式"
-                                                checked={theme === '浅色模式'}
-                                                style={{ marginBottom: 8, fontWeight: 500 }}
-                                                onChange={(e) => handleThemeChange('浅色模式')}
-                                            />
-                                        </div>
-                                        <div style={{
-                                            width: '100%',
-                                            height: '80px',
-                                            backgroundColor: '#FFFFFF',
-                                            borderRadius: '6px',
-                                            border: '1px solid #E1E1E1',
-                                            overflow: 'hidden',
-                                            position: 'relative'
-                                        }}>
+            case '基本设置':
+                return (
+                    <>
+                        <div style={{ marginBottom: 24 }}>
+                            <H5 style={{ color: isDark ? '#E8E8E8' : '#1A1A1A', fontSize: '14px', marginBottom: 8 }}>
+                                主题设置
+                            </H5>
+                            <Divider style={{
+                                backgroundColor: isDark ? '#333333' : '#E1E1E1',
+                                margin: '8px 0'
+                            }} />
+                            <div style={{ marginTop: 16 }}>
+                                <RadioGroup
+                                    label="选择主题"
+                                    selectedValue={theme}
+                                    onChange={(e) => handleThemeChange(e.currentTarget.value)}
+                                    style={{ fontSize: '13px' }}
+                                >
+                                    <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
+                                        <div
+                                            style={{
+                                                cursor: 'pointer',
+                                                border: `2px solid ${theme === 'light' ? (isDark ? '#48AFF0' : '#137CBD') : 'transparent'}`,
+                                                borderRadius: '8px',
+                                                padding: '8px',
+                                                backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
+                                                width: '150px',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                            onClick={() => handleThemeChange('light')}
+                                        >
+                                            <div onClick={(e) => e.stopPropagation()}>
+                                                <Radio
+                                                    label="光明"
+                                                    value="light"
+                                                    checked={theme === 'light'}
+                                                    style={{ marginBottom: 8, fontWeight: 500 }}
+                                                    onChange={(e) => handleThemeChange('light')}
+                                                />
+                                            </div>
                                             <div style={{
-                                                position: 'absolute',
-                                                top: '8px',
-                                                left: '8px',
-                                                right: '8px',
-                                                bottom: '8px',
-                                                backgroundColor: '#F5F5F5',
-                                                borderRadius: '4px',
-                                                border: '1px solid #E1E1E1'
+                                                width: '100%',
+                                                height: '80px',
+                                                backgroundColor: '#FFFFFF',
+                                                borderRadius: '6px',
+                                                border: '1px solid #E1E1E1',
+                                                overflow: 'hidden',
+                                                position: 'relative'
                                             }}>
                                                 <div style={{
-                                                    height: '16px',
-                                                    backgroundColor: '#FFFFFF',
-                                                    borderBottom: '1px solid #E1E1E1',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    padding: '0 4px'
+                                                    position: 'absolute',
+                                                    top: '8px',
+                                                    left: '8px',
+                                                    right: '8px',
+                                                    bottom: '8px',
+                                                    backgroundColor: '#F5F5F5',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid #E1E1E1'
                                                 }}>
                                                     <div style={{
-                                                        width: '4px',
-                                                        height: '4px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#FF5F56',
-                                                        marginRight: '4px'
-                                                    }} />
+                                                        height: '16px',
+                                                        backgroundColor: '#FFFFFF',
+                                                        borderBottom: '1px solid #E1E1E1',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        padding: '0 4px'
+                                                    }}>
+                                                        <div style={{
+                                                            width: '4px',
+                                                            height: '4px',
+                                                            borderRadius: '50%',
+                                                            backgroundColor: '#FF5F56',
+                                                            marginRight: '4px'
+                                                        }} />
+                                                        <div style={{
+                                                            width: '4px',
+                                                            height: '4px',
+                                                            borderRadius: '50%',
+                                                            backgroundColor: '#FFBD2E',
+                                                            marginRight: '4px'
+                                                        }} />
+                                                        <div style={{
+                                                            width: '4px',
+                                                            height: '4px',
+                                                            borderRadius: '50%',
+                                                            backgroundColor: '#27C93F'
+                                                        }} />
+                                                    </div>
                                                     <div style={{
-                                                        width: '4px',
-                                                        height: '4px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#FFBD2E',
-                                                        marginRight: '4px'
-                                                    }} />
-                                                    <div style={{
-                                                        width: '4px',
-                                                        height: '4px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#27C93F'
-                                                    }} />
-                                                </div>
-                                                <div style={{
-                                                    padding: '6px',
-                                                    fontSize: '8px',
-                                                    color: '#333333',
-                                                    fontFamily: 'monospace'
-                                                }}>
-                                                    <div style={{
-                                                        width: '60%',
-                                                        height: '6px',
-                                                        backgroundColor: '#137CBD',
-                                                        marginBottom: '4px',
-                                                        borderRadius: '2px'
-                                                    }} />
-                                                    <div style={{
-                                                        width: '80%',
-                                                        height: '4px',
-                                                        backgroundColor: '#E1E1E1',
-                                                        marginBottom: '3px',
-                                                        borderRadius: '1px'
-                                                    }} />
-                                                    <div style={{
-                                                        width: '70%',
-                                                        height: '4px',
-                                                        backgroundColor: '#E1E1E1',
-                                                        marginBottom: '3px',
-                                                        borderRadius: '1px'
-                                                    }} />
-                                                    <div style={{
-                                                        width: '40%',
-                                                        height: '4px',
-                                                        backgroundColor: '#E1E1E1',
-                                                        borderRadius: '1px'
-                                                    }} />
+                                                        padding: '6px',
+                                                        fontSize: '8px',
+                                                        color: '#333333',
+                                                        fontFamily: 'monospace'
+                                                    }}>
+                                                        <div style={{
+                                                            width: '60%',
+                                                            height: '6px',
+                                                            backgroundColor: '#137CBD',
+                                                            marginBottom: '4px',
+                                                            borderRadius: '2px'
+                                                        }} />
+                                                        <div style={{
+                                                            width: '80%',
+                                                            height: '4px',
+                                                            backgroundColor: '#E1E1E1',
+                                                            marginBottom: '3px',
+                                                            borderRadius: '1px'
+                                                        }} />
+                                                        <div style={{
+                                                            width: '70%',
+                                                            height: '4px',
+                                                            backgroundColor: '#E1E1E1',
+                                                            marginBottom: '3px',
+                                                            borderRadius: '1px'
+                                                        }} />
+                                                        <div style={{
+                                                            width: '40%',
+                                                            height: '4px',
+                                                            backgroundColor: '#E1E1E1',
+                                                            borderRadius: '1px'
+                                                        }} />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div style={{
-                                            color: isDark ? '#8A8A8A' : '#666666',
-                                            fontSize: '11px',
-                                            marginTop: '6px',
-                                            textAlign: 'center'
-                                        }}>
-                                            明亮舒适的界面
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        style={{
-                                            cursor: 'pointer',
-                                            border: `2px solid ${theme === '深色模式' ? (isDark ? '#48AFF0' : '#137CBD') : 'transparent'}`,
-                                            borderRadius: '8px',
-                                            padding: '8px',
-                                            backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
-                                            width: '150px',
-                                            transition: 'all 0.2s ease'
-                                        }}
-                                        onClick={() => handleThemeChange('深色模式')}
-                                    >
-                                        <div onClick={(e) => e.stopPropagation()}>
-                                            <Radio
-                                                label="深色模式"
-                                                value="深色模式"
-                                                checked={theme === '深色模式'}
-                                                style={{ marginBottom: 8, fontWeight: 500 }}
-                                                onChange={(e) => handleThemeChange('深色模式')}
-                                            />
-                                        </div>
-                                        <div style={{
-                                            width: '100%',
-                                            height: '80px',
-                                            backgroundColor: '#000000',
-                                            borderRadius: '6px',
-                                            border: '1px solid #444444',
-                                            overflow: 'hidden',
-                                            position: 'relative'
-                                        }}>
                                             <div style={{
-                                                position: 'absolute',
-                                                top: '8px',
-                                                left: '8px',
-                                                right: '8px',
-                                                bottom: '8px',
-                                                backgroundColor: '#1A1A1A',
-                                                borderRadius: '4px',
-                                                border: '1px solid #333333'
+                                                color: isDark ? '#8A8A8A' : '#666666',
+                                                fontSize: '11px',
+                                                marginTop: '6px',
+                                                textAlign: 'center'
+                                            }}>
+                                                明亮舒适的界面
+                                            </div>
+                                        </div>
+
+                                        <div
+                                            style={{
+                                                cursor: 'pointer',
+                                                border: `2px solid ${theme === 'dark' ? (isDark ? '#48AFF0' : '#137CBD') : 'transparent'}`,
+                                                borderRadius: '8px',
+                                                padding: '8px',
+                                                backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5',
+                                                width: '150px',
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                            onClick={() => handleThemeChange('dark')}
+                                        >
+                                            <div onClick={(e) => e.stopPropagation()}>
+                                                <Radio
+                                                    label="黑暗"
+                                                    value="dark"
+                                                    checked={theme === 'dark'}
+                                                    style={{ marginBottom: 8, fontWeight: 500 }}
+                                                    onChange={(e) => handleThemeChange('dark')}
+                                                />
+                                            </div>
+                                            <div style={{
+                                                width: '100%',
+                                                height: '80px',
+                                                backgroundColor: '#000000',
+                                                borderRadius: '6px',
+                                                border: '1px solid #444444',
+                                                overflow: 'hidden',
+                                                position: 'relative'
                                             }}>
                                                 <div style={{
-                                                    height: '16px',
-                                                    backgroundColor: '#000000',
-                                                    borderBottom: '1px solid #333333',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    padding: '0 4px'
+                                                    position: 'absolute',
+                                                    top: '8px',
+                                                    left: '8px',
+                                                    right: '8px',
+                                                    bottom: '8px',
+                                                    backgroundColor: '#1A1A1A',
+                                                    borderRadius: '4px',
+                                                    border: '1px solid #333333'
                                                 }}>
                                                     <div style={{
-                                                        width: '4px',
-                                                        height: '4px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#FF5F56',
-                                                        marginRight: '4px'
-                                                    }} />
+                                                        height: '16px',
+                                                        backgroundColor: '#000000',
+                                                        borderBottom: '1px solid #333333',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        padding: '0 4px'
+                                                    }}>
+                                                        <div style={{
+                                                            width: '4px',
+                                                            height: '4px',
+                                                            borderRadius: '50%',
+                                                            backgroundColor: '#FF5F56',
+                                                            marginRight: '4px'
+                                                        }} />
+                                                        <div style={{
+                                                            width: '4px',
+                                                            height: '4px',
+                                                            borderRadius: '50%',
+                                                            backgroundColor: '#FFBD2E',
+                                                            marginRight: '4px'
+                                                        }} />
+                                                        <div style={{
+                                                            width: '4px',
+                                                            height: '4px',
+                                                            borderRadius: '50%',
+                                                            backgroundColor: '#27C93F'
+                                                        }} />
+                                                    </div>
                                                     <div style={{
-                                                        width: '4px',
-                                                        height: '4px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#FFBD2E',
-                                                        marginRight: '4px'
-                                                    }} />
-                                                    <div style={{
-                                                        width: '4px',
-                                                        height: '4px',
-                                                        borderRadius: '50%',
-                                                        backgroundColor: '#27C93F'
-                                                    }} />
-                                                </div>
-                                                <div style={{
-                                                    padding: '6px',
-                                                    fontSize: '8px',
-                                                    color: '#CCCCCC',
-                                                    fontFamily: 'monospace'
-                                                }}>
-                                                    <div style={{
-                                                        width: '60%',
-                                                        height: '6px',
-                                                        backgroundColor: '#48AFF0',
-                                                        marginBottom: '4px',
-                                                        borderRadius: '2px'
-                                                    }} />
-                                                    <div style={{
-                                                        width: '80%',
-                                                        height: '4px',
-                                                        backgroundColor: '#333333',
-                                                        marginBottom: '3px',
-                                                        borderRadius: '1px'
-                                                    }} />
-                                                    <div style={{
-                                                        width: '70%',
-                                                        height: '4px',
-                                                        backgroundColor: '#333333',
-                                                        marginBottom: '3px',
-                                                        borderRadius: '1px'
-                                                    }} />
-                                                    <div style={{
-                                                        width: '40%',
-                                                        height: '4px',
-                                                        backgroundColor: '#333333',
-                                                        borderRadius: '1px'
-                                                    }} />
+                                                        padding: '6px',
+                                                        fontSize: '8px',
+                                                        color: '#CCCCCC',
+                                                        fontFamily: 'monospace'
+                                                    }}>
+                                                        <div style={{
+                                                            width: '60%',
+                                                            height: '6px',
+                                                            backgroundColor: '#48AFF0',
+                                                            marginBottom: '4px',
+                                                            borderRadius: '2px'
+                                                        }} />
+                                                        <div style={{
+                                                            width: '80%',
+                                                            height: '4px',
+                                                            backgroundColor: '#333333',
+                                                            marginBottom: '3px',
+                                                            borderRadius: '1px'
+                                                        }} />
+                                                        <div style={{
+                                                            width: '70%',
+                                                            height: '4px',
+                                                            backgroundColor: '#333333',
+                                                            marginBottom: '3px',
+                                                            borderRadius: '1px'
+                                                        }} />
+                                                        <div style={{
+                                                            width: '40%',
+                                                            height: '4px',
+                                                            backgroundColor: '#333333',
+                                                            borderRadius: '1px'
+                                                        }} />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div style={{
-                                            color: isDark ? '#8A8A8A' : '#666666',
-                                            fontSize: '11px',
-                                            marginTop: '6px',
-                                            textAlign: 'center'
-                                        }}>
-                                            夜间使用更护眼
+                                            <div style={{
+                                                color: isDark ? '#8A8A8A' : '#666666',
+                                                fontSize: '11px',
+                                                marginTop: '6px',
+                                                textAlign: 'center'
+                                            }}>
+                                                夜间使用更护眼
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </RadioGroup>
+                                </RadioGroup>
+                            </div>
                         </div>
-                    </div>
 
-                    <div style={{ marginBottom: 16 }}>
-                        <H5 style={{ color: isDark ? '#E8E8E8' : '#1A1A1A', fontSize: '14px', marginBottom: 8 }}>
-                            偏好设置
-                        </H5>
-                        <Divider style={{
-                            backgroundColor: isDark ? '#333333' : '#E1E1E1',
-                            margin: '8px 0'
-                        }} />
-                        <div style={{ marginTop: 12 }}>
-                            <FormGroup
-                                label="开机自动启动"
-                                labelInfo="(启动时自动打开应用)"
-                                labelFor="auto-start"
-                                inline
-                                style={{ marginBottom: 10 }}
-                            >
-                                <Switch
-                                    id="auto-start"
-                                    checked={autoStart}
-                                    onChange={(e) => setAutoStart(e.currentTarget.checked)}
-                                    label="启用"
-                                    style={{ margin: 0 }}
-                                />
-                            </FormGroup>
-                            <FormGroup
-                                label="自动检查更新"
-                                labelInfo="(自动检查新版本并提醒)"
-                                labelFor="auto-update"
-                                inline
-                                style={{ marginBottom: 10 }}
-                            >
-                                <Switch
-                                    id="auto-update"
-                                    checked={autoUpdate}
-                                    onChange={(e) => setAutoUpdate(e.currentTarget.checked)}
-                                    label="启用"
-                                    style={{ margin: 0 }}
-                                />
-                            </FormGroup>
+                        <div style={{ marginBottom: 16 }}>
+                            <H5 style={{ color: isDark ? '#E8E8E8' : '#1A1A1A', fontSize: '14px', marginBottom: 8 }}>
+                                偏好设置
+                            </H5>
+                            <Divider style={{
+                                backgroundColor: isDark ? '#333333' : '#E1E1E1',
+                                margin: '8px 0'
+                            }} />
+                            <div style={{ marginTop: 12 }}>
+                                <FormGroup
+                                    label="开机自动启动"
+                                    labelInfo="(启动时自动打开应用)"
+                                    labelFor="auto-start"
+                                    inline
+                                    style={{ marginBottom: 10 }}
+                                >
+                                    <Switch
+                                        id="auto-start"
+                                        checked={autoStart}
+                                        onChange={async (e) => {
+                                            setAutoStart(e.currentTarget.checked);
+                                            await savePreferenceSetting(e.currentTarget.checked, autoUpdate);
+                                        }}
+                                        label="启用"
+                                        style={{ margin: 0 }}
+                                    />
+                                </FormGroup>
+                                <FormGroup
+                                    label="自动检查更新"
+                                    labelInfo="(自动检查新版本并提醒)"
+                                    labelFor="auto-update"
+                                    inline
+                                    style={{ marginBottom: 10 }}
+                                >
+                                    <Switch
+                                        id="auto-update"
+                                        checked={autoUpdate}
+                                        onChange={async (e) => {
+                                            setAutoUpdate(e.currentTarget.checked);
+                                            await savePreferenceSetting(autoStart, e.currentTarget.checked);
+                                        }}
+                                        label="启用"
+                                        style={{ margin: 0 }}
+                                    />
+                                </FormGroup>
+                            </div>
                         </div>
-                    </div>
-                </>
-            );
+                    </>
+                );
             case 'Git设置':
                 return (
                     <>
@@ -398,7 +422,10 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
                                         id="git-username"
                                         placeholder="请输入Git用户名"
                                         value={gitUsername}
-                                        onChange={(e) => setGitUsername(e.target.value)}
+                                        onChange={async (e) => {
+                                            setGitUsername(e.target.value);
+                                            await saveGitSetting(gitAutoCommit, e.target.value, gitEmail);
+                                        }}
                                         style={{ width: '100%', maxWidth: '280px' }}
                                         small
                                     />
@@ -412,7 +439,10 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
                                         id="git-email"
                                         placeholder="请输入Git邮箱"
                                         value={gitEmail}
-                                        onChange={(e) => setGitEmail(e.target.value)}
+                                        onChange={async (e) => {
+                                            setGitEmail(e.target.value);
+                                            await saveGitSetting(gitAutoCommit, gitUsername, e.target.value);
+                                        }}
                                         style={{ width: '100%', maxWidth: '280px' }}
                                         small
                                     />
@@ -427,7 +457,10 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
                                     <Switch
                                         id="git-auto-commit"
                                         checked={gitAutoCommit}
-                                        onChange={(e) => setGitAutoCommit(e.currentTarget.checked)}
+                                        onChange={async (e) => {
+                                            setGitAutoCommit(e.currentTarget.checked);
+                                            await saveGitSetting(e.currentTarget.checked, gitUsername, gitEmail);
+                                        }}
                                         label="启用"
                                         style={{ margin: 0 }}
                                     />
@@ -534,7 +567,10 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
                                             id="storage-path"
                                             placeholder="请选择笔记存储目录"
                                             value={noteStoragePath}
-                                            onChange={(e) => setNoteStoragePath(e.target.value)}
+                                            onChange={async (e) => {
+                                                setNoteStoragePath(e.target.value);
+                                                await savePathSetting(e.target.value, backupPath, autoBackup);
+                                            }}
                                             style={{ flex: 1 }}
                                             small
                                         />
@@ -557,7 +593,11 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
                                             id="backup-path"
                                             placeholder="请选择备份目录"
                                             value={backupPath}
-                                            onChange={(e) => setBackupPath(e.target.value)}
+                                            onChange={async (e) => {
+                                                setBackupPath(e.target.value);
+                                                await savePathSetting(noteStoragePath, e.target.value, autoBackup);
+                                            }}
+
                                             style={{ flex: 1 }}
                                             small
                                         />
@@ -580,7 +620,10 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
                                     <Switch
                                         id="auto-backup"
                                         checked={autoBackup}
-                                        onChange={(e) => setAutoBackup(e.currentTarget.checked)}
+                                        onChange={async (e) => {
+                                            setAutoBackup(e.currentTarget.checked);
+                                            await savePathSetting(noteStoragePath, backupPath, e.currentTarget.checked);
+                                        }}
                                         label="启用"
                                         style={{ margin: 0 }}
                                     />

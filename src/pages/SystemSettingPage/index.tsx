@@ -55,7 +55,6 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
                     setTheme('light');
                 }
             } catch (error) {
-                console.error('Failed to load config:', error);
             }
         };
         loadConfig();
@@ -73,9 +72,7 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
         try {
             const themeValue = newTheme === 'light' ? 'light' : 'dark';
             await saveThemeSetting(themeValue);
-            console.log('主题已保存到配置文件:', themeValue);
         } catch (error) {
-            console.error('保存主题设置失败:', error);
         }
     };
 

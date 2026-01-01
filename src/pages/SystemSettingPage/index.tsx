@@ -138,7 +138,9 @@ const SystemSettingPage: React.FC<SystemSettingPageProps> = ({ isDark: propIsDar
                         onThemeChange={handleThemeChange}
                         onAutoStartChange={handleAutoStartChange}
                         onAutoUpdateChange={handleAutoUpdateChange}
-                    />
+                        language={'cn'}
+                        onLanguageChange={function (newLanguage: string): void {
+                        }} />
                 );
             case 'Git设置':
                 return (

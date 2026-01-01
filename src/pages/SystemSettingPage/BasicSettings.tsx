@@ -5,9 +5,11 @@ interface BasicSettingsProps {
     theme: string;
     autoStart: boolean;
     autoUpdate: boolean;
+    language: string;
     onThemeChange: (newTheme: string) => void;
     onAutoStartChange: (checked: boolean) => void;
     onAutoUpdateChange: (checked: boolean) => void;
+    onLanguageChange: (newLanguage: string) => void;
 }
 
 const BasicSettings: React.FC<BasicSettingsProps> = ({
@@ -15,9 +17,11 @@ const BasicSettings: React.FC<BasicSettingsProps> = ({
     theme,
     autoStart,
     autoUpdate,
+    language,
     onThemeChange,
     onAutoStartChange,
-    onAutoUpdateChange
+    onAutoUpdateChange,
+    onLanguageChange
 }) => {
     const styles = {
         container: {
@@ -171,8 +175,62 @@ const BasicSettings: React.FC<BasicSettingsProps> = ({
         switchText: {
             fontSize: '13px',
             color: isDark ? '#E8E8E8' : '#1A1A1A'
+        },
+        languageOptions: {
+            display: 'flex',
+            gap: '16px',
+            marginTop: '12px'
+        } as React.CSSProperties,
+        languageCard: {
+            cursor: 'pointer',
+            borderRadius: '8px',
+            padding: '12px',
+            width: '140px',
+            transition: 'all 0.2s ease',
+            position: 'relative' as const,
+            display: 'flex',
+            alignItems: 'center',
+            border: '2px solid transparent'
+        },
+        languageFlag: {
+            width: '24px',
+            height: '24px',
+            borderRadius: '4px',
+            overflow: 'hidden' as const,
+            marginRight: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '12px',
+            fontWeight: 'bold'
+        },
+        languageInfo: {
+            display: 'flex',
+            flexDirection: 'column' as const
+        },
+        languageName: {
+            fontSize: '13px',
+            fontWeight: 500,
+            marginBottom: '2px'
+        },
+        languageCode: {
+            fontSize: '11px',
+            color: isDark ? '#8A8A8A' : '#666666'
         }
     };
+
+    const languages = [
+        {
+            code: 'zh-CN',
+            name: '简体中文',
+            flag: '🇨🇳'
+        },
+        {
+            code: 'en-US',
+            name: 'English',
+            flag: '🇺🇸'
+        }
+    ];
 
     return (
         <div style={styles.container}>
@@ -371,7 +429,45 @@ const BasicSettings: React.FC<BasicSettingsProps> = ({
                     </div>
                 </div>
             </div>
-
+            <div style={styles.section}>
+                <h5 style={styles.sectionTitle}>语言设置</h5>
+                <hr style={styles.divider} />
+                <div style={styles.languageOptions}>
+                    {languages.map((lang) => (
+                        <div
+                            key={lang.code}
+                            style={{
+                                ...styles.languageCard,
+                                border: `2px solid ${language === lang.code ? (isDark ? '#48AFF0' : '#137CBD') : 'transparent'}`,
+                                backgroundColor: isDark ? '#2A2A2A' : '#F5F5F5'
+                            }}
+                            onClick={() => onLanguageChange(lang.code)}
+                        >
+                            <div
+                                style={{
+                                    ...styles.languageFlag,
+                                    backgroundColor: language === lang.code
+                                        ? (isDark ? '#48AFF0' : '#137CBD')
+                                        : (isDark ? '#333333' : '#E1E1E1')
+                                }}
+                            >
+                                {lang.flag}
+                            </div>
+                            <div style={styles.languageInfo}>
+                                <span style={{
+                                    ...styles.languageName,
+                                    color: isDark ? '#E8E8E8' : '#1A1A1A'
+                                }}>
+                                    {lang.name}
+                                </span>
+                                <span style={styles.languageCode}>
+                                    {lang.code}
+                                </span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
             <div style={styles.section}>
                 <h5 style={styles.sectionTitle}>偏好设置</h5>
                 <hr style={styles.divider} />
@@ -405,7 +501,6 @@ const BasicSettings: React.FC<BasicSettingsProps> = ({
                             </label>
                         </div>
                     </div>
-
                     <div style={styles.formGroup}>
                         <div style={styles.formLabel}>
                             <span style={styles.mainLabel}>

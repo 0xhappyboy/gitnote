@@ -8,8 +8,6 @@ import {
     Icon,
     Classes,
     Dialog,
-    Popover,
-    Position
 } from '@blueprintjs/core';
 import { themeManager } from '../../globals/theme/ThemeManager';
 import { TextFormatUtils } from './TextFormatUtils';
@@ -399,7 +397,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                 if (textToolbarBold) newLength += 4;
                 if (textToolbarItalic) newLength += 2;
                 if (textToolbarStrikethrough) newLength += 4;
-                if (textToolbarUnderline) newLength += 7;
+                if (textToolbarUnderline) newLength += 7; 
                 const newCursorPos = selectedTextRange.start + newLength;
                 this.contentRef.current.focus();
                 this.contentRef.current.setSelectionRange(newCursorPos, newCursorPos);
@@ -990,7 +988,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         let currentLineIndex = 0;
         let charCount = 0;
         for (let i = 0; i < lines.length; i++) {
-            charCount += lines[i].length + 1;
+            charCount += lines[i].length + 1;  
             if (charCount > start) {
                 currentLineIndex = i;
                 break;
@@ -1088,11 +1086,11 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             if (this.contentRef.current) {
                 this.contentRef.current.focus();
                 if (format === 'normal') {
-                    this.contentRef.current.setSelectionRange(newCursorPos + 4, newCursorPos + 4);
+                    this.contentRef.current.setSelectionRange(newCursorPos + 4, newCursorPos + 4);  
                 } else if (format === 'h1') {
-                    this.contentRef.current.setSelectionRange(newCursorPos + 11, newCursorPos + 11);
+                    this.contentRef.current.setSelectionRange(newCursorPos + 11, newCursorPos + 11);  
                 } else if (format === 'attachment') {
-                    this.contentRef.current.setSelectionRange(newCursorPos + 1, newCursorPos + 11);
+                    this.contentRef.current.setSelectionRange(newCursorPos + 1, newCursorPos + 11);  
                 } else {
                     this.contentRef.current.setSelectionRange(newCursorPos, newCursorPos);
                 }
@@ -1497,7 +1495,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                         const lines = value.split('\n');
                                         let lineStartIndex = 0;
                                         for (let i = 0; i < hoveredLineNumber - 1; i++) {
-                                            lineStartIndex += lines[i].length + 1;
+                                            lineStartIndex += lines[i].length + 1; 
                                         }
                                         const lineEndIndex = lineStartIndex + lines[hoveredLineNumber - 1]?.length || 0;
                                         textArea.focus();

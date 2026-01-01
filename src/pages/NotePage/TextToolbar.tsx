@@ -161,14 +161,11 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
         const buttonCount = 12;
         const totalWidth = buttonCount * buttonWidth + (buttonCount - 1) * buttonSpacing + 16;
         const toolbarHeight = 40;
-
         let left = position.x - totalWidth / 2;
         let top = position.y + 10;
-
         if (!editorRect) {
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
-
             if (left < 10) left = 10;
             if (left + totalWidth > screenWidth - 10) {
                 left = screenWidth - totalWidth - 10;
@@ -182,33 +179,25 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
             const editorTop = editorRect.top;
             const editorRight = editorRect.right;
             const editorBottom = editorRect.bottom;
-
             if (left < editorLeft + 10) {
                 left = editorLeft + 10;
             }
-
             if (left + totalWidth > editorRight - 10) {
                 left = editorRight - totalWidth - 10;
             }
-
             if (top + toolbarHeight > editorBottom - 10) {
                 top = position.y - toolbarHeight - 10;
             }
-
             if (top < editorTop + 10) {
                 top = editorTop + 10;
             }
-
             if (top + toolbarHeight > editorBottom - 10) {
                 top = Math.max(editorTop + 10, position.y - toolbarHeight - 10);
             }
         }
-
         return { left, top, width: totalWidth };
     };
-
     const { left, top, width } = calculateToolbarPosition();
-
     const createStyledDiv = (children: React.ReactNode, maxHeight?: string, customStyle?: React.CSSProperties) => (
         <div style={{
             backgroundColor: isDark ? '#2A2A2A' : '#FFFFFF',
@@ -265,6 +254,32 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
             }}
             onClick={(e) => e.stopPropagation()}
         >
+            <style>
+                {`.bp6-popover-transition-container { top: 40px !important; }`}
+            </style>
+            <style>
+                {`
+                div[style*="position: fixed"] button.bp6-button,
+                div[style*="position: fixed"] button.bp6-button:focus,
+                div[style*="position: fixed"] button.bp6-button:active,
+                div[style*="position: fixed"] button.bp6-button:hover,
+                div[style*="position: fixed"] button.bp6-button.bp6-active {
+                    outline: none !important;
+                    box-shadow: none !important;
+                    border: none !important;
+                    background-color: transparent !important;
+                }
+                div[style*="position: fixed"] .bp6-button * {
+                    outline: none !important;
+                }
+                [class*="TextToolbar"] button,
+                [class*="TextToolbar"] button:focus,
+                [class*="TextToolbar"] button:active {
+                    outline: none !important;
+                    box-shadow: none !important;
+                }
+            `}
+            </style>
             <div style={{ position: 'relative' }}>
                 <Popover
                     content={
@@ -293,6 +308,7 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
                     }
                     position="bottom"
                     minimal
+                    usePortal={false}
                     popoverClassName="toolbar-popover"
                     modifiers={{
                         preventOverflow: { enabled: true, boundariesElement: 'viewport' },
@@ -411,6 +427,7 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
                     }
                     position="bottom"
                     minimal
+                    usePortal={false}
                     popoverClassName="toolbar-popover"
                     modifiers={{
                         preventOverflow: { enabled: true, boundariesElement: 'viewport' },
@@ -464,6 +481,7 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
                     }
                     position="bottom"
                     minimal
+                    usePortal={false}
                     popoverClassName="toolbar-popover"
                     modifiers={{
                         preventOverflow: { enabled: true, boundariesElement: 'viewport' },
@@ -550,6 +568,7 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
                     }
                     position="bottom"
                     minimal
+                    usePortal={false}
                     popoverClassName="toolbar-popover"
                     modifiers={{
                         preventOverflow: { enabled: true, boundariesElement: 'viewport' },
@@ -706,6 +725,7 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
                     }
                     position="bottom"
                     minimal
+                    usePortal={false}
                     popoverClassName="toolbar-popover"
                     modifiers={{
                         preventOverflow: { enabled: true, boundariesElement: 'viewport' },
@@ -770,6 +790,7 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
                     }
                     position="bottom"
                     minimal
+                    usePortal={false}
                     popoverClassName="toolbar-popover"
                     modifiers={{
                         preventOverflow: { enabled: true, boundariesElement: 'viewport' },

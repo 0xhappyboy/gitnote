@@ -75,7 +75,7 @@ pub async fn open_system_setting_window(app: tauri::AppHandle) -> Result<(), Str
     let label = format!("sytemsetting_{}", chrono::Utc::now().timestamp_millis());
     let _window = WebviewWindowBuilder::new(&app, label, WebviewUrl::App("/systemsetting".into()))
         .inner_size(560.0, 528.0)
-        .title("Luminliquid - Multi Panel Trading")
+        .title("System Settting.")
         .min_inner_size(560.0, 528.0)
         .resizable(false)
         .decorations(false)

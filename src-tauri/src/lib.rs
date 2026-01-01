@@ -1,3 +1,4 @@
+use crate::commands::file_command::get_note_storage_directory_tree;
 use crate::commands::system_command::*;
 use crate::events::system_event::setup_theme_events;
 use crate::{
@@ -10,8 +11,9 @@ use crate::{
 pub mod commands;
 pub mod config;
 pub mod context;
-pub mod global;
 pub mod events;
+pub mod files;
+pub mod global;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -28,7 +30,8 @@ pub fn run() {
             save_git_setting,
             save_preference_setting,
             get_theme_setting,
-            save_theme_setting
+            save_theme_setting,
+            get_note_storage_directory_tree
         ])
         .setup(|app| {
             setup_theme_events(&app.handle());

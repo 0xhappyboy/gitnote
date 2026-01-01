@@ -13,6 +13,7 @@ import { themeManager } from '../../globals/theme/ThemeManager';
 import { TextFormatUtils } from './TextFormatUtils';
 import TextToolbar from './TextToolbar';
 import { setupThemeChangeListener } from '../../globals/events/SystemEvents';
+import { FileInfo, getDirectoryTree } from '../../globals/commands/FileCommand';
 
 interface NotePageIndexProps {
     children?: React.ReactNode;
@@ -76,6 +77,12 @@ interface NotePageIndexState {
     isLinkDialogOpen: boolean;
     linkUrl: string;
     linkText: string;
+
+    fileTree: FileInfo[];
+    expandedFiles: Set<string>;
+    selectedFile: string | null;
+    isLoadingFiles: boolean;
+    fileTreeError: string | null;
 }
 
 class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexState> {
@@ -213,7 +220,13 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             textToolbarAlignment: 'left',
             isLinkDialogOpen: false,
             linkUrl: '',
-            linkText: ''
+            linkText: '',
+
+            fileTree: [],
+            expandedFiles: new Set<string>(),
+            selectedFile: null,
+            isLoadingFiles: false,
+            fileTreeError: null,
         };
     }
 
@@ -228,6 +241,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
         this.themeUnlisten = setupThemeChangeListener((theme: string, isDark: any) => {
             this.handleThemeChange(theme as 'dark' | 'light');
         });
+        this.loadFileTree();
     }
 
     componentWillUnmount() {
@@ -244,6 +258,215 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             this.themeUnlisten();
         }
     }
+
+    private loadFileTree = async (): Promise<void> => {
+        this.setState({ isLoadingFiles: true, fileTreeError: null });
+        try {
+            const fileTree = await getDirectoryTree();
+            const fileComponents = this.transformFileTreeToComponents(fileTree, {
+                onFileSelect: this.handleFileSelect,
+                onFolderToggle: this.handleFolderToggle,
+                expandedFolders: this.state.expandedFiles,
+                theme: this.state.theme
+            });
+            this.setState({
+                fileTree,
+                isLoadingFiles: false,
+            });
+        } catch (error) {
+            this.setState({
+                fileTreeError: error instanceof Error ? error.message : 'Unknown error',
+                isLoadingFiles: false,
+                fileTree: [],
+            });
+        }
+    };
+
+    private handleFileSelect = (file: FileInfo): void => {
+        this.setState({ selectedFile: file.path });
+    };
+
+    private handleFolderToggle = (folder: FileInfo): void => {
+        const { expandedFiles } = this.state;
+        const newExpandedFiles = new Set(expandedFiles);
+        if (newExpandedFiles.has(folder.path)) {
+            newExpandedFiles.delete(folder.path);
+        } else {
+            newExpandedFiles.add(folder.path);
+        }
+        this.setState({ expandedFiles: newExpandedFiles });
+    };
+
+    private transformFileTreeToComponents = (
+        files: FileInfo[],
+        options?: {
+            onFileSelect?: (file: FileInfo) => void;
+            onFolderToggle?: (folder: FileInfo) => void;
+            expandedFolders?: Set<string>;
+            theme?: 'dark' | 'light';
+        }
+    ): any[] => {
+        const {
+            onFileSelect = () => { },
+            onFolderToggle = () => { },
+            expandedFolders = new Set<string>(),
+            theme = 'light'
+        } = options || {};
+        const isDark = theme === 'dark';
+        const renderFileItem = (file: FileInfo): any => {
+            const isFolder = file.type === 'Directory';
+            const isExpanded = expandedFolders.has(file.path);
+            if (isFolder) {
+                return {
+                    id: file.path,
+                    type: 'folder',
+                    name: file.name,
+                    path: file.path,
+                    depth: file.depth,
+                    isExpanded,
+                    children: file.children.map(renderFileItem),
+                    onClick: () => onFolderToggle(file),
+                };
+            } else {
+                return {
+                    id: file.path,
+                    type: 'file',
+                    name: file.name,
+                    path: file.path,
+                    depth: file.depth,
+                    extension: file.extension,
+                    size: file.size,
+                    modified: file.modified,
+                    onClick: () => onFileSelect(file),
+                };
+            }
+        };
+        return files.map(renderFileItem);
+    };
+
+    private renderTreeComponents = (components: any[]): React.ReactNode => {
+        const { theme, selectedFile } = this.state;
+        const isDark = theme === 'dark';
+        return components.map((item) => {
+            if (item.type === 'folder') {
+                return (
+                    <React.Fragment key={item.id}>
+                        <MenuItem
+                            icon={item.isExpanded ? "folder-open" : "folder-close"}
+                            text={
+                                <div
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        width: '100%',
+                                        position: 'relative',
+                                        paddingRight: '24px',
+                                    }}
+                                    title={item.path}
+                                >
+                                    <span style={{
+                                        flex: 1,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                        color: isDark ? '#CCCCCC' : '#333333',
+                                        fontSize: '12px',
+                                    }}>
+                                        {item.name}
+                                    </span>
+                                    <Button
+                                        icon="plus"
+                                        minimal={true}
+                                        small={true}
+                                        style={{
+                                            padding: '2px',
+                                            minHeight: '18px',
+                                            minWidth: '18px',
+                                            opacity: 0.7,
+                                            position: 'absolute',
+                                            right: '4px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                        }}
+                                        title="Add note to this folder"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                        }}
+                                    />
+                                </div>
+                            }
+                            onClick={() => item.onClick()}
+                            active={false}
+                            style={{
+                                paddingLeft: `${16 + item.depth * 20}px`,
+                                backgroundColor: 'transparent',
+                            }}
+                        />
+                        {item.isExpanded && item.children && (
+                            <div style={{ paddingLeft: `${item.depth * 20}px` }}>
+                                {this.renderTreeComponents(item.children)}
+                            </div>
+                        )}
+                    </React.Fragment>
+                );
+            } else {
+                const isSelected = selectedFile === item.path;
+                return (
+                    <MenuItem
+                        key={item.id}
+                        icon="document"
+                        text={
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    width: '100%',
+                                }}
+                                title={`${item.name}\n${item.path}`}
+                            >
+                                <span style={{
+                                    flex: 1,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    fontSize: '12px',
+                                    fontWeight: isSelected ? '600' : '400',
+                                    color: isSelected
+                                        ? (isDark ? '#48AFF0' : '#137CBD')
+                                        : (isDark ? '#CCCCCC' : '#333333'),
+                                    transition: 'color 0.2s ease'
+                                }}>
+                                    {item.name}
+                                </span>
+                                {item.extension && (
+                                    <span style={{
+                                        fontSize: '9px',
+                                        color: isDark ? '#555555' : '#999999',
+                                        marginLeft: '4px',
+                                        fontFamily: 'monospace',
+                                    }}>
+                                        {item.extension}
+                                    </span>
+                                )}
+                            </div>
+                        }
+                        onClick={() => item.onClick()}
+                        active={isSelected}
+                        style={{
+                            paddingLeft: `${16 + (item.depth) * 20}px`,
+                            backgroundColor: 'transparent',
+                            borderLeft: isSelected
+                                ? `3px solid ${isDark ? '#48AFF0' : '#137CBD'}`
+                                : '3px solid transparent',
+                        }}
+                    />
+                );
+            }
+        });
+    };
 
     private handleScroll = (): void => {
         const { isTextToolbarOpen } = this.state;
@@ -496,9 +719,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                     y = selectedRect.bottom;
                 }
                 document.body.removeChild(tempDiv);
-
             } catch (error) {
-                console.error('获取选中文本位置失败:', error);
                 const lines = textArea.value.substring(0, start).split('\n');
                 const lineNumber = lines.length;
                 const lineHeight = this.LINE_HEIGHT;
@@ -1603,7 +1824,12 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             isLinkDialogOpen,
             linkUrl,
             linkText,
-            selectedText
+            selectedText,
+            fileTree,
+            expandedFiles,
+            selectedFile,
+            isLoadingFiles,
+            fileTreeError
         } = this.state;
 
         const activeNote = this.getActiveNote();
@@ -1825,7 +2051,35 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
                                         overflow: 'visible'
                                     }}
                                 >
+                                    {/* 显示文件树 */}
+                                    {fileTree.length > 0 && (
+                                        <div style={{ padding: '4px 0' }}>
+                                            <div style={{
+                                                padding: '8px 12px',
+                                                fontSize: '11px',
+                                                color: isDark ? '#8A8A8A' : '#666666',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.5px'
+                                            }}>
+                                                File Explorer
+                                            </div>
+                                            {this.renderTreeComponents(
+                                                this.transformFileTreeToComponents(
+                                                    fileTree,
+                                                    {
+                                                        onFileSelect: this.handleFileSelect,
+                                                        onFolderToggle: this.handleFolderToggle,
+                                                        expandedFolders: expandedFiles,
+                                                        theme: theme
+                                                    }
+                                                )
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* 原有的文件夹树 */}
                                     {this.renderFolderTree()}
+
                                     {this.getFilteredNotes() && (
                                         <div style={{ padding: '4px 0' }}>
                                             <div style={{
@@ -2114,6 +2368,7 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             </div>
         );
     }
+
 }
 
 export default NotePageIndex;

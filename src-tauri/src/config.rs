@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+const CONFIG_STORAGE_DIRECTORY_NAME: &str = ".gitnote";
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AppConfig {
     pub theme: String,
@@ -25,7 +27,7 @@ impl Default for AppConfig {
             git_username: String::new(),
             git_email: String::new(),
             auto_backup: true,
-            note_storage_path: String::new(),
+            note_storage_path: "D:\\demo\\gitnote-test".to_string(),
             backup_path: String::new(),
         }
     }
@@ -35,7 +37,7 @@ impl AppConfig {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     pub fn load() -> std::io::Result<Self> {
         let config_path = Self::config_path();
         if config_path.exists() {
@@ -46,17 +48,17 @@ impl AppConfig {
             Ok(Self::default())
         }
     }
-    
+
     pub fn save(&self) -> std::io::Result<()> {
         let config_path = Self::config_path();
         let content = serde_json::to_string_pretty(self)?;
         fs::write(config_path, content)?;
         Ok(())
     }
-    
+
     fn config_path() -> PathBuf {
         let mut path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-        path.push("luminliquid");
+        path.push(CONFIG_STORAGE_DIRECTORY_NAME);
         if !path.exists() {
             fs::create_dir_all(&path).unwrap_or_default();
         }
@@ -74,39 +76,48 @@ impl ConfigManager {
         let config = AppConfig::load().unwrap_or_default();
         Self { config }
     }
-    
+
     pub fn get_config(&self) -> AppConfig {
         self.config.clone()
     }
-    
+
     pub fn update_theme(&mut self, theme: String) -> std::io::Result<()> {
         self.config.theme = theme;
         self.config.save()
     }
-    
+
     pub fn update_auto_start(&mut self, auto_start: bool) -> std::io::Result<()> {
         self.config.auto_start = auto_start;
         self.config.save()
     }
-    
+
     pub fn update_auto_update(&mut self, auto_update: bool) -> std::io::Result<()> {
         self.config.auto_update = auto_update;
         self.config.save()
     }
-    
-    pub fn update_git_config(&mut self, git_auto_commit: bool, git_username: String, git_email: String) -> std::io::Result<()> {
+
+    pub fn update_git_config(
+        &mut self,
+        git_auto_commit: bool,
+        git_username: String,
+        git_email: String,
+    ) -> std::io::Result<()> {
         self.config.git_auto_commit = git_auto_commit;
         self.config.git_username = git_username;
         self.config.git_email = git_email;
         self.config.save()
     }
-    
-    pub fn update_path_config(&mut self, note_storage_path: String, backup_path: String) -> std::io::Result<()> {
+
+    pub fn update_path_config(
+        &mut self,
+        note_storage_path: String,
+        backup_path: String,
+    ) -> std::io::Result<()> {
         self.config.note_storage_path = note_storage_path;
         self.config.backup_path = backup_path;
         self.config.save()
     }
-    
+
     pub fn update_auto_backup(&mut self, auto_backup: bool) -> std::io::Result<()> {
         self.config.auto_backup = auto_backup;
         self.config.save()

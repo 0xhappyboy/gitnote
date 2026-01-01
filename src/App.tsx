@@ -3,13 +3,14 @@ import './App.css';
 import { themeManager } from './globals/theme/ThemeManager';
 import TopArea from './components/top/TopArea';
 import MiddleArea from './components/center/MiddleArea';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import NotePageIndex from './pages/NotePage';
 
 import FavoritesPage from './pages/FavoritesPage';
 import TagsPage from './pages/TagsPage';
 import TodoPage from './pages/TodoPage';
 import AppsPage from './pages/AppsPage';
+import SystemSettingPage from './pages/SystemSettingPage';
 
 require('normalize.css');
 require('@blueprintjs/core/lib/css/blueprint.css');
@@ -78,6 +79,9 @@ class App extends React.Component<{}, AppState> {
               {activePage === 'todo' && <TodoPage />}
               {activePage === 'apps' && <AppsPage />}
             </MiddleArea>
+            <Routes>
+              <Route path='/systemsetting' element={<SystemSettingPage />} />
+            </Routes>
           </div>
         </BrowserRouter>
       </React.StrictMode>

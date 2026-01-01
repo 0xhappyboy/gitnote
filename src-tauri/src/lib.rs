@@ -1,6 +1,6 @@
 use crate::{
     commands::windows_command::{
-        close_window, drag_window, maximize_window, minimize_window, multi_panel_window,
+        close_window, drag_window, maximize_window, minimize_window, open_system_setting_window,
         recovery_window,
     },
     context::AppState,
@@ -20,7 +20,7 @@ pub fn run() {
             recovery_window,
             close_window,
             drag_window,
-            multi_panel_window
+            open_system_setting_window
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

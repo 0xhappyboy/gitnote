@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Button
 } from '@blueprintjs/core';
+import { handleOpenSystemSettingWindow } from '../../globals/commands/WindowsCommand';
 
 interface MiddleAreaProps {
   children: React.ReactNode;
@@ -167,6 +168,7 @@ const MiddleArea: React.FC<MiddleAreaProps> = ({
             minimal
             icon="cog"
             title="Settings"
+            onClick={handleOpenSystemSettingWindow}
             style={{
               width: '36px',
               height: '36px',

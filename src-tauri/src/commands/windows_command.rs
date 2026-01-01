@@ -69,15 +69,15 @@ pub fn drag_window(window: tauri::Window) -> Result<(), String> {
     Ok(())
 }
 
-/// multi panel window
+/// open system setting window
 #[tauri::command]
-pub async fn multi_panel_window(app: tauri::AppHandle) -> Result<(), String> {
-    let label = format!("multi_panel_{}", chrono::Utc::now().timestamp_millis());
-    let _window = WebviewWindowBuilder::new(&app, label, WebviewUrl::App("/multi_panel".into()))
-        .inner_size(1200.0, 800.0)
+pub async fn open_system_setting_window(app: tauri::AppHandle) -> Result<(), String> {
+    let label = format!("sytemsetting_{}", chrono::Utc::now().timestamp_millis());
+    let _window = WebviewWindowBuilder::new(&app, label, WebviewUrl::App("/systemsetting".into()))
+        .inner_size(560.0, 528.0)
         .title("Luminliquid - Multi Panel Trading")
-        .min_inner_size(800.0, 600.0)
-        .resizable(true)
+        .min_inner_size(560.0, 528.0)
+        .resizable(false)
         .decorations(false)
         .build()
         .map_err(|e| format!("create window error: {}", e))?;

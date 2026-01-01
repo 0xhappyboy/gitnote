@@ -27,7 +27,6 @@ interface TextToolbarProps {
     isLinkDialogOpen: boolean;
     linkUrl: string;
     linkText: string;
-
     onTextTypeChange: (type: string) => void;
     onBoldToggle: () => void;
     onItalicToggle: () => void;
@@ -81,7 +80,6 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
 }) => {
     const isDark = theme === 'dark';
     const toolbarRef = useRef<HTMLDivElement>(null);
-
     const textTypes = [
         { value: 'normal', label: '正文' },
         { value: 'h1', label: '一级标题' },
@@ -95,14 +93,12 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
         { value: 'inline-code', label: '行内代码' },
         { value: 'blockquote', label: '引用块' }
     ];
-
     const fontFamilies = [
         { value: 'default', label: '默认' },
         { value: 'serif', label: '宋体' },
         { value: 'sans-serif', label: '黑体' },
         { value: 'monospace', label: '等宽字体' }
     ];
-
     const fontSizes = [
         { value: '12px', label: '12' },
         { value: '14px', label: '14' },
@@ -113,13 +109,11 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
         { value: '28px', label: '28' },
         { value: '32px', label: '32' }
     ];
-
     const alignments = [
         { value: 'left', label: '左对齐', icon: 'align-left' },
         { value: 'center', label: '居中对齐', icon: 'align-center' },
         { value: 'right', label: '右对齐', icon: 'align-right' }
     ];
-
     const colors = [
         '#000000', '#434343', '#666666', '#999999', '#B7B7B7', '#CCCCCC', '#D9D9D9', '#EFEFEF', '#F3F3F3', '#FFFFFF',
         '#FF0000', '#FF9900', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#9900FF', '#FF00FF',
@@ -130,13 +124,11 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
         '#990000', '#B45F06', '#BF9000', '#38761D', '#134F5C', '#0B5394', '#351C75', '#741B47',
         '#660000', '#783F04', '#7F6000', '#274E13', '#0C343D', '#073763', '#20124D', '#4C1130'
     ];
-
     const bgColors = [
         'transparent',
         '#FFFF00', '#FFE4E1', '#E0FFFF', '#F0FFF0', '#FFF8DC',
         '#FFD700', '#FFB6C1', '#87CEFA', '#98FB98', '#F0E68C'
     ];
-
     const getTextTypeIcon = (value: string) => {
         switch (value) {
             case 'h1': return 'header-one';
@@ -149,12 +141,10 @@ const TextToolbar: React.FC<TextToolbarProps> = ({
             default: return 'paragraph';
         }
     };
-
     const getFontSizeLabel = (value: string) => {
         const size = fontSizes.find(s => s.value === value);
         return size ? size.label.replace('px', '') : '14';
     };
-
     const calculateToolbarPosition = () => {
         const buttonWidth = 26;
         const buttonSpacing = 5;

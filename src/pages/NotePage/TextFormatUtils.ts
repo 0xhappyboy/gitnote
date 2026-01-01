@@ -84,9 +84,6 @@ export class TextFormatUtils {
         return content.substring(0, start) + formattedText + content.substring(end);
     }
 
-    /**
-     * 将选中的文本转换为超链接
-     */
     static applyLink(
         content: string,
         start: number,
@@ -98,9 +95,6 @@ export class TextFormatUtils {
         return content.substring(0, start) + linkText + content.substring(end);
     }
 
-    /**
-     * 检测当前光标位置的格式
-     */
     static detectFormatAtPosition(
         content: string,
         position: number
@@ -118,14 +112,11 @@ export class TextFormatUtils {
             underline: false,
             strikethrough: false
         };
-
         if (position < 0 || position > content.length) return format;
-
         const checkRange = 10;
         const start = Math.max(0, position - checkRange);
         const end = Math.min(content.length, position + checkRange);
         const context = content.substring(start, end);
-
         const boldRegex = /\*\*(.*?)\*\*/g;
         let match;
         while ((match = boldRegex.exec(context)) !== null) {
@@ -134,7 +125,6 @@ export class TextFormatUtils {
                 break;
             }
         }
-
         const italicRegex = /\*(.*?)\*/g;
         while ((match = italicRegex.exec(context)) !== null) {
             if (position >= start + match.index && position <= start + match.index + match[0].length) {
@@ -142,7 +132,6 @@ export class TextFormatUtils {
                 break;
             }
         }
-
         const strikethroughRegex = /~~(.*?)~~/g;
         while ((match = strikethroughRegex.exec(context)) !== null) {
             if (position >= start + match.index && position <= start + match.index + match[0].length) {
@@ -150,14 +139,12 @@ export class TextFormatUtils {
                 break;
             }
         }
-
         const lineStart = content.lastIndexOf('\n', position - 1) + 1;
         const lineEnd = content.indexOf('\n', position);
         const line = content.substring(
             lineStart,
             lineEnd === -1 ? content.length : lineEnd
         );
-
         if (line.startsWith('# ')) format.type = 'h1';
         else if (line.startsWith('## ')) format.type = 'h2';
         else if (line.startsWith('### ')) format.type = 'h3';
@@ -168,7 +155,6 @@ export class TextFormatUtils {
         else if (/^\d+\. /.test(line)) format.type = 'ol';
         else if (line.startsWith('> ')) format.type = 'blockquote';
         else if (line.includes('`')) format.type = 'inline-code';
-
         return format;
     }
 }

@@ -59,7 +59,6 @@ interface NotePageIndexState {
     tableSelectedRows: number;
     tableSelectedCols: number;
     isSelectingTable: boolean;
-
     isTextToolbarOpen: boolean;
     textToolbarPosition: { x: number; y: number } | null;
     editorRect: DOMRect | null;
@@ -78,7 +77,6 @@ interface NotePageIndexState {
     isLinkDialogOpen: boolean;
     linkUrl: string;
     linkText: string;
-
     fileTree: FileInfo[];
     expandedFiles: Set<string>;
     selectedFile: string | null;
@@ -222,7 +220,6 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
             isLinkDialogOpen: false,
             linkUrl: '',
             linkText: '',
-
             fileTree: [],
             expandedFiles: new Set<string>(),
             selectedFile: null,
@@ -360,125 +357,196 @@ class NotePageIndex extends React.Component<NotePageIndexProps, NotePageIndexSta
     private renderTreeComponents = (components: any[]): React.ReactNode => {
         const { theme, selectedFile } = this.state;
         const isDark = theme === 'dark';
-        return components.map((item) => {
+        const renderItem = (item: any) => {
             if (item.type === 'folder') {
+                const isExpanded = item.isExpanded;
                 return (
-                    <React.Fragment key={item.id}>
-                        <MenuItem
-                            icon={item.isExpanded ? "folder-open" : "folder-close"}
-                            text={
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        width: '100%',
-                                        position: 'relative',
-                                        paddingRight: '24px',
-                                    }}
-                                    title={item.path}
-                                >
-                                    <span style={{
-                                        flex: 1,
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                        color: isDark ? '#CCCCCC' : '#333333',
-                                        fontSize: '12px',
-                                    }}>
-                                        {item.name}
-                                    </span>
-                                    <Button
-                                        icon="plus"
-                                        minimal={true}
-                                        small={true}
-                                        style={{
-                                            padding: '2px',
-                                            minHeight: '18px',
-                                            minWidth: '18px',
-                                            opacity: 0.7,
-                                            position: 'absolute',
-                                            right: '4px',
-                                            top: '50%',
-                                            transform: 'translateY(-50%)',
-                                        }}
-                                        title="Add note to this folder"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            e.preventDefault();
-                                        }}
-                                    />
-                                </div>
-                            }
+                    <div key={item.id}>
+                        <div
+                            className="tree-item folder-item"
                             onClick={() => item.onClick()}
-                            active={false}
                             style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                padding: '6px 12px',
                                 paddingLeft: `${16 + item.depth * 20}px`,
                                 backgroundColor: 'transparent',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                userSelect: 'none'
                             }}
-                        />
-                        {item.isExpanded && item.children && (
-                            <div style={{ paddingLeft: `${item.depth * 20}px` }}>
-                                {this.renderTreeComponents(item.children)}
-                            </div>
-                        )}
-                    </React.Fragment>
-                );
-            } else {
-                const isSelected = selectedFile === item.path;
-                return (
-                    <MenuItem
-                        key={item.id}
-                        icon="document"
-                        text={
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.backgroundColor = isDark
+                                    ? 'rgba(255, 255, 255, 0.1)'
+                                    : 'rgba(0, 0, 0, 0.05)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
+                        >
+                            <Icon
+                                icon={isExpanded ? "folder-open" : "folder-close"}
+                                style={{
+                                    marginRight: '8px',
+                                    color: isDark ? '#8A8A8A' : '#666666'
+                                }}
+                                iconSize={14}
+                            />
                             <div
                                 style={{
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'space-between',
                                     width: '100%',
+                                    position: 'relative',
+                                    paddingRight: '24px',
                                 }}
-                                title={`${item.name}\n${item.path}`}
+                                title={item.path}
                             >
                                 <span style={{
                                     flex: 1,
                                     overflow: 'hidden',
                                     textOverflow: 'ellipsis',
                                     whiteSpace: 'nowrap',
+                                    color: isDark ? '#CCCCCC' : '#333333',
                                     fontSize: '12px',
-                                    fontWeight: isSelected ? '600' : '400',
-                                    color: isSelected
-                                        ? (isDark ? '#48AFF0' : '#137CBD')
-                                        : (isDark ? '#CCCCCC' : '#333333'),
-                                    transition: 'color 0.2s ease'
                                 }}>
                                     {item.name}
                                 </span>
-                                {item.extension && (
-                                    <span style={{
-                                        fontSize: '9px',
-                                        color: isDark ? '#555555' : '#999999',
-                                        marginLeft: '4px',
-                                        fontFamily: 'monospace',
-                                    }}>
-                                        {item.extension}
-                                    </span>
-                                )}
+                                <button
+                                    className="tree-action-button"
+                                    style={{
+                                        padding: '2px',
+                                        minHeight: '18px',
+                                        minWidth: '18px',
+                                        opacity: 0.7,
+                                        position: 'absolute',
+                                        right: '4px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        color: isDark ? '#8A8A8A' : '#666666',
+                                        borderRadius: '3px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: '10px'
+                                    }}
+                                    title="Add note to this folder"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = isDark
+                                            ? 'rgba(255, 255, 255, 0.2)'
+                                            : 'rgba(0, 0, 0, 0.1)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                    }}
+                                >
+                                    +
+                                </button>
                             </div>
-                        }
+                        </div>
+                        {item.isExpanded && item.children && (
+                            <div style={{ paddingLeft: `${item.depth * 20}px` }}>
+                                {item.children.map((child: any) => renderItem(child))}
+                            </div>
+                        )}
+                    </div>
+                );
+            } else {
+                const isSelected = selectedFile === item.path;
+                return (
+                    <div
+                        key={item.id}
+                        className={`tree-item file-item ${isSelected ? 'selected' : ''}`}
                         onClick={() => item.onClick()}
-                        active={isSelected}
                         style={{
-                            paddingLeft: `${16 + (item.depth) * 20}px`,
-                            backgroundColor: 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '6px 12px',
+                            paddingLeft: `${16 + item.depth * 20}px`,
+                            backgroundColor: isSelected
+                                ? (isDark ? 'rgba(72, 175, 240, 0.2)' : 'rgba(19, 124, 189, 0.1)')
+                                : 'transparent',
+                            cursor: 'pointer',
+                            userSelect: 'none',
                             borderLeft: isSelected
                                 ? `3px solid ${isDark ? '#48AFF0' : '#137CBD'}`
                                 : '3px solid transparent',
+                            transition: 'background-color 0.2s ease, border-color 0.2s ease'
                         }}
-                    />
+                        onMouseEnter={(e) => {
+                            if (!isSelected) {
+                                e.currentTarget.style.backgroundColor = isDark
+                                    ? 'rgba(255, 255, 255, 0.1)'
+                                    : 'rgba(0, 0, 0, 0.05)';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (!isSelected) {
+                                e.currentTarget.style.backgroundColor = 'transparent';
+                            }
+                        }}
+                    >
+                        <Icon
+                            icon="document"
+                            style={{
+                                marginRight: '8px',
+                                color: isSelected
+                                    ? (isDark ? '#48AFF0' : '#137CBD')
+                                    : (isDark ? '#8A8A8A' : '#666666')
+                            }}
+                            iconSize={14}
+                        />
+                        <div
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                width: '100%',
+                            }}
+                            title={`${item.name}\n${item.path}`}
+                        >
+                            <span style={{
+                                flex: 1,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                                fontSize: '12px',
+                                fontWeight: isSelected ? '600' : '400',
+                                color: isSelected
+                                    ? (isDark ? '#48AFF0' : '#137CBD')
+                                    : (isDark ? '#CCCCCC' : '#333333'),
+                                transition: 'color 0.2s ease'
+                            }}>
+                                {item.name}
+                            </span>
+                            {item.extension && (
+                                <span style={{
+                                    fontSize: '9px',
+                                    color: isDark ? '#555555' : '#999999',
+                                    marginLeft: '4px',
+                                    fontFamily: 'monospace',
+                                }}>
+                                    {item.extension}
+                                </span>
+                            )}
+                        </div>
+                    </div>
                 );
             }
-        });
+        };
+        return (
+            <div className="file-tree-container">
+                {components.map((item) => renderItem(item))}
+            </div>
+        );
     };
 
     private handleScroll = (): void => {
